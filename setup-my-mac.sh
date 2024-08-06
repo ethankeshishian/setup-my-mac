@@ -22,6 +22,7 @@ brew install zsh-autocomplete
 brew install zsh-autosuggestions
 brew install zsh-syntax-highlighting
 brew install powerlevel10k
+brew install thefuck
 cp ./config/.p10k.zsh ~/
 echo '# Terminal' >> ~/.zshrc
 echo '# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
@@ -35,6 +36,7 @@ echo 'source /opt/homebrew/share/powerlevel10k/powerlevel10k.zsh-theme
 source $HOMEBREW_PREFIX/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh
 source $HOMEBREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 source $HOMEBREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+eval $(thefuck --alias)
 alias ls="ls --color"' >> ~/.zshrc
 echo -e '\n' >> ~/.zshrc
 
