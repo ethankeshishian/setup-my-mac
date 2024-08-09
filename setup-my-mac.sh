@@ -14,7 +14,7 @@ brew install --cask "font-martian-mono-nerd-font"
 
 # Terminal (kitty)
 brew install --cask kitty
-kitten themes Cobalt2
+kitten themes catppuccin-mocha
 cp -f ./config/kitty.conf ~/.config/kitty/
 
 # Shell (zsh)
@@ -46,6 +46,11 @@ brew install ripgrep
 git clone https://github.com/NvChad/starter ~/.config/nvim
 cp -rf ./config/nvim/init.lua ~/.config/nvim/
 cp -rf ./config/nvim/lua/* ~/.config/nvim/lua/
+
+# Tmux
+brew install tmux
+brew install tpm
+cp -f ./config/.tmux.conf ~/
 
 # Aliases
 echo '# Aliases' >> ~/.zshrc
