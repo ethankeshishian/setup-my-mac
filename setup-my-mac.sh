@@ -1,5 +1,16 @@
 #!/bin/bash
 
+# System settings (dock, menu bar, trackpad)
+defaults write com.apple.dock orientation right
+defaults write com.apple.dock autohide-delay -int 0
+defaults write com.apple.dock autohide-time-modifier -float 0.4
+defaults write com.apple.dock wvous-bl-corner -int 4
+defaults write com.apple.dock wvous-br-modifier -int 1048576
+killall Dock
+defaults write NSGlobalDomain _HIHideMenuBar -bool true
+defaults -currentHost write NSGlobalDomain com.apple.trackpad.threeFingerSwipeGesture -int 1
+
+
 # General
 if ! command -v brew &> /dev/null; then
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -58,3 +69,7 @@ echo 'alias python=python3
 alias pip=pip3
 alias nv=nvim
 alias vim=nvim' >> ~/.zshrc
+
+# Software
+brew install --cask mac-mouse-fix@2
+cp ./config/mmf/config.plist ~/Library/Application\ Support/com.nuebling.mac-mouse-fix/
