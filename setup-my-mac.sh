@@ -73,6 +73,7 @@ alias vim=nvim' >> ~/.zshrc
 # Software
 brew install --cask mac-mouse-fix@2
 cp ./config/mmf/config.plist ~/Library/Application\ Support/com.nuebling.mac-mouse-fix/
+brew install --cask betterdisplay
 
 # Applications
 brew install --cask spotify
