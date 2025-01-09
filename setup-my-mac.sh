@@ -83,3 +83,4 @@ brew install --cask spotify
 brew install --cask arc
 brew install --cask todoist
 brew install --cask obsidian
+brew install --cask clay
