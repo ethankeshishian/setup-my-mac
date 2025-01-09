@@ -71,12 +71,15 @@ alias nv=nvim
 alias vim=nvim' >> ~/.zshrc
 
 # Software
-brew install --cask mac-mouse-fix@2
+brew install --cask mos # for smooth scrolling with mouse
+brew install --cask mac-mouse-fix@2 # v2 is free for life, v3 is not
 cp ./config/mmf/config.plist ~/Library/Application\ Support/com.nuebling.mac-mouse-fix/
-brew install --cask betterdisplay
+brew install --cask betterdisplay # allows monitor brightness control from keyboard
 brew install --cask alt-tab # will need to be manually configured
+brew install --cask logi-options+
 
 # Applications
 brew install --cask spotify
 brew install --cask arc
 brew install --cask todoist
+brew install --cask obsidian
