@@ -74,7 +74,9 @@ alias vim=nvim' >> ~/.zshrc
 brew install --cask mac-mouse-fix@2
 cp ./config/mmf/config.plist ~/Library/Application\ Support/com.nuebling.mac-mouse-fix/
 brew install --cask betterdisplay
+brew install --cask alt-tab # will need to be manually configured
 
 # Applications
 brew install --cask spotify
 brew install --cask arc
+brew install --cask todoist
