@@ -77,6 +77,11 @@ cp ./config/mmf/config.plist ~/Library/Application\ Support/com.nuebling.mac-mou
 brew install --cask betterdisplay # allows monitor brightness control from keyboard
 brew install --cask alt-tab # will need to be manually configured
 brew install --cask logi-options+
+brew install --cask raycast
+/usr/libexec/PlistBuddy ~/Library/Preferences/com.apple.symbolichotkeys.plist -c \
+  "Add :AppleSymbolicHotKeys:64:enabled bool false"
+/usr/libexec/PlistBuddy ~/Library/Preferences/com.apple.symbolichotkeys.plist -c \
+  "Delete :AppleSymbolicHotKeys:64"
 
 # Applications
 brew install --cask spotify
