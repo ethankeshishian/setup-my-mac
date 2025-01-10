@@ -78,10 +78,22 @@ brew install --cask betterdisplay # allows monitor brightness control from keybo
 brew install --cask alt-tab # will need to be manually configured
 brew install --cask logi-options+
 brew install --cask raycast
-/usr/libexec/PlistBuddy ~/Library/Preferences/com.apple.symbolichotkeys.plist -c \
-  "Add :AppleSymbolicHotKeys:64:enabled bool false"
-/usr/libexec/PlistBuddy ~/Library/Preferences/com.apple.symbolichotkeys.plist -c \
-  "Delete :AppleSymbolicHotKeys:64"
+/usr/libexec/PlistBuddy ~/Library/Preferences/com.apple.symbolichotkeys.plist \
+  -c "Delete :AppleSymbolicHotKeys:64" \
+  -c "Add :AppleSymbolicHotKeys:64:enabled bool false" \
+  -c "Add :AppleSymbolicHotKeys:64:value:parameters array" \
+  -c "Add :AppleSymbolicHotKeys:64:value:parameters: integer 65535" \
+  -c "Add :AppleSymbolicHotKeys:64:value:parameters: integer 49" \
+  -c "Add :AppleSymbolicHotKeys:64:value:parameters: integer 1048576" \
+  -c "Add :AppleSymbolicHotKeys:64:type string standard"
+/usr/libexec/PlistBuddy ~/Library/Preferences/com.apple.symbolichotkeys.plist \
+  -c "Delete :AppleSymbolicHotKeys:65" \
+  -c "Add :AppleSymbolicHotKeys:65:enabled bool false" \
+  -c "Add :AppleSymbolicHotKeys:65:value:parameters array" \
+  -c "Add :AppleSymbolicHotKeys:65:value:parameters: integer 65535" \
+  -c "Add :AppleSymbolicHotKeys:65:value:parameters: integer 49" \
+  -c "Add :AppleSymbolicHotKeys:65:value:parameters: integer 1572864" \
+  -c "Add :AppleSymbolicHotKeys:65:type string standard"
 
 # Applications
 brew install --cask spotify
