@@ -8,8 +8,12 @@ defaults write com.apple.dock wvous-bl-corner -int 4
 defaults write com.apple.dock wvous-br-modifier -int 1048576
 killall Dock
 defaults write NSGlobalDomain _HIHideMenuBar -bool true
-defaults -currentHost write NSGlobalDomain com.apple.trackpad.threeFingerSwipeGesture -int 1
-
+defaults write com.apple.AppleMultitouchTrackpad DragLock -bool false # three finger drag
+defaults write com.apple.AppleMultitouchTrackpad Dragging -bool false
+defaults write com.apple.AppleMultitouchTrackpad TrackpadThreeFingerDrag -bool true
+defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -bool true # tap to click
+defaults write com.apple.AppleMultitouchTrackpad Clicking -bool true
+/System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u
 
 # General
 if ! command -v brew &> /dev/null; then
