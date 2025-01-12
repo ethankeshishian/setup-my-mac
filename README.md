@@ -4,6 +4,5 @@ This script is meant to setup my Mac. The goal is to provide a setup for homebre
 
 Other features to support in the future:
 
-- Installing productivity software: Raycast, Alfred
-- Alt-Tab config, not available 
-- Installing personal software: Rise
+- To install: Karabiner, Aerospace, Rise
+- Alt-Tab, Raycast config not available 
