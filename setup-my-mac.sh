@@ -14,6 +14,7 @@ defaults write com.apple.AppleMultitouchTrackpad TrackpadThreeFingerDrag -bool t
 defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -bool true # tap to click
 defaults write com.apple.AppleMultitouchTrackpad Clicking -bool true
 /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u
+defaults write -g NSWindowShouldDragOnGesture -bool true # drag window with ctrl + cmd
 
 # General
 if ! command -v brew &> /dev/null; then
@@ -98,6 +99,10 @@ brew install --cask raycast
   -c "Add :AppleSymbolicHotKeys:65:value:parameters: integer 49" \
   -c "Add :AppleSymbolicHotKeys:65:value:parameters: integer 1572864" \
   -c "Add :AppleSymbolicHotKeys:65:type string standard"
+brew install --cask nikitabobko/tap/aerospace
+brew tap FelixKratz/formulae
+brew install borders
+cp -f ./config/.aerospace.toml ~/
 
 # Applications
 brew install --cask spotify
