@@ -103,6 +103,8 @@ brew install --cask nikitabobko/tap/aerospace
 brew tap FelixKratz/formulae
 brew install borders
 cp -f ./config/.aerospace.toml ~/
+brew install --cask karabiner-elements
+cp -f ./config/karabiner.json ~/.config/karabiner/
 
 # Applications
 brew install --cask spotify
