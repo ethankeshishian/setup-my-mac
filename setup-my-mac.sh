@@ -113,4 +113,5 @@ brew install --cask arc
 brew install --cask todoist
 brew install --cask obsidian
 brew install --cask clay
+brew install --cask notion-calendar
 brew install --cask visual-studio-code
