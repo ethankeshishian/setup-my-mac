@@ -6,6 +6,7 @@ defaults write com.apple.dock autohide-delay -int 0
 defaults write com.apple.dock autohide-time-modifier -float 0.4
 defaults write com.apple.dock wvous-bl-corner -int 4
 defaults write com.apple.dock wvous-br-modifier -int 1048576
+defaults write com.apple.dock show-recents -bool FALSE
 killall Dock
 defaults write NSGlobalDomain _HIHideMenuBar -bool true
 defaults write com.apple.AppleMultitouchTrackpad DragLock -bool false # three finger drag
