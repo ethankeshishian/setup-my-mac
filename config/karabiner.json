@@ -5,6 +5,7 @@
                 "rules": [
                     {
                         "description": "Change spacebar to hyper. Post spacebar if pressed alone (internal keyboard only).",
+                        "enabled": false,
                         "manipulators": [
                             {
                                 "conditions": [
