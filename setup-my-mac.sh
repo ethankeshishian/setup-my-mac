@@ -75,6 +75,12 @@ echo 'alias python=python3
 alias pip=pip3
 alias nv=nvim
 alias vim=nvim' >> ~/.zshrc
+echo -e '\n' >> ~/.zshrc
+
+# Zsh behavior
+echo '# zsh behavior
+bindkey -v "^?" backward-delete-char
+KEYTIMEOUT=1' >> ~/.zshrc
 
 # Software
 brew install --cask mos # for smooth scrolling with mouse
