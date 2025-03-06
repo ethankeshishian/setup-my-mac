@@ -5,6 +5,7 @@ return {
       view = {
         number = true,
         relativenumber = true,
+        adaptive_size = true,
       },
     },
   },
