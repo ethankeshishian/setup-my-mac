@@ -1,0 +1,10 @@
+{
+  "languageserver": {
+    "static-ls": {
+      "command": "static-ls",
+      "rootPatterns": ["*.cabal", "stack.yaml", "cabal.project", "package.yaml", "hie.yaml"],
+      "filetypes": ["haskell"]
+    },
+  },
+}
+
