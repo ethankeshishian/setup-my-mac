@@ -62,6 +62,7 @@ brew install neovim
 brew install ripgrep
 git clone https://github.com/NvChad/starter ~/.config/nvim
 cp -rf ./config/nvim/init.lua ~/.config/nvim/
+cp -rf ./config/nvim/coc-settings.json ~/.config/nvim/
 cp -rf ./config/nvim/lua/* ~/.config/nvim/lua/
 
 # Tmux
