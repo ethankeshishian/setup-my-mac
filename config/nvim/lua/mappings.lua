@@ -7,6 +7,7 @@ local map = vim.keymap.set
 map("n", ";", ":", { desc = "CMD enter command mode" })
 map("i", "jk", "<ESC>")
 map("i", "fp", "<ESC>")
+map("n", "<leader>fr", "<cmd>Telescope resume<CR>", { desc = "telescope resume" })
 
 -- map({ "n", "i", "v" }, "<C-s>", "<cmd> w <cr>")
 
