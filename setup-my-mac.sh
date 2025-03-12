@@ -121,4 +121,5 @@ brew install --cask todoist
 brew install --cask obsidian
 brew install --cask clay
 brew install --cask notion-calendar
+brew install --cask raindropio
 brew install --cask visual-studio-code
