@@ -29,3 +29,9 @@ vim.keymap.set('n', '<C-down>', ':TmuxNavigateDown<CR>', { noremap = true, silen
 vim.keymap.set('n', '<C-up>', ':TmuxNavigateUp<CR>', { noremap = true, silent = true })
 vim.keymap.set('n', '<C-right>', ':TmuxNavigateRight<CR>', { noremap = true, silent = true })
 vim.keymap.set('n', '<C-\\>', ':TmuxNavigatePrevious<CR>', { noremap = true, silent = true })
+
+-- Mappings to navigate out of nvim terminal
+vim.keymap.set("t", "<C-left>", "<C-\\><C-n>:wincmd h<CR>")
+vim.keymap.set("t", "<C-down>", "<C-\\><C-n>:wincmd j<CR>")
+vim.keymap.set("t", "<C-up>", "<C-\\><C-n>:wincmd k<CR>")
+vim.keymap.set("t", "<C-right>", "<C-\\><C-n>:wincmd l<CR>")
