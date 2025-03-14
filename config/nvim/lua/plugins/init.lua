@@ -13,6 +13,22 @@ return {
     end,
   },
 
+  -- Preserve default opts while adding my own
+  {
+    "nvim-telescope/telescope.nvim",
+    opts = function(_, opts)
+      vim.api.nvim_create_autocmd("User", {
+        pattern = "TelescopePreviewerLoaded",
+        callback = function()
+          vim.wo.number = true
+          vim.wo.wrap = true
+        end,
+      })
+      return opts
+    end,
+  }
+}
+
   -- {
   -- 	"nvim-treesitter/nvim-treesitter",
   -- 	opts = {
