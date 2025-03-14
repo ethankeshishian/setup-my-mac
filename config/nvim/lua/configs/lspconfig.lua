@@ -44,5 +44,14 @@ end
 lspconfig.static_ls.setup({
   autostart = true,
   capabilities = nvlsp.capabilities,
-  on_attach = nvlsp.on_attach,
+  on_attach = function(client, bufnr)
+    -- Enable inlay hints if supported
+    if client.server_capabilities.inlayHintProvider then
+      vim.lsp.inlay_hint.enable()
+    end
+    -- Call the default on_attach function if it exists
+    if nvlsp.on_attach then
+      nvlsp.on_attach(client, bufnr)
+    end
+  end
 })
