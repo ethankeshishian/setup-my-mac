@@ -11,6 +11,8 @@ map("i", "fp", "<ESC>")
 map("n", "<leader>tr", "<cmd>Telescope resume<CR>", { desc = "telescope resume" })
 map("n", "<leader>fe", "<cmd>Telescope diagnostics<CR>", { desc = "telescope find errors" })
 map("n", "<leader>fr", "<cmd>Telescope lsp_references<CR>", { desc = "telescope find references" })
+map("n", "<leader>se", "<cmd>lua vim.diagnostic.open_float()<CR>", { desc = "show diagnostic error" })
+map("n", "<leader>si", "<cmd>lua vim.lsp.buf.hover()<CR>", { desc = "show information" })
 
 -- map({ "n", "i", "v" }, "<C-s>", "<cmd> w <cr>")
 
