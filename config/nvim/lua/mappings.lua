@@ -8,8 +8,9 @@ map("n", ";", ":", { desc = "CMD enter command mode" })
 map("i", "jk", "<ESC>")
 map("i", "fp", "<ESC>")
 
-map("n", "<leader>fr", "<cmd>Telescope resume<CR>", { desc = "telescope resume" })
-map("n", "<leader>fe", "<cmd>Telescope diagnostics<CR>", { desc = "telescope errors" })
+map("n", "<leader>tr", "<cmd>Telescope resume<CR>", { desc = "telescope resume" })
+map("n", "<leader>fe", "<cmd>Telescope diagnostics<CR>", { desc = "telescope find errors" })
+map("n", "<leader>fr", "<cmd>Telescope lsp_references<CR>", { desc = "telescope find references" })
 
 -- map({ "n", "i", "v" }, "<C-s>", "<cmd> w <cr>")
 
