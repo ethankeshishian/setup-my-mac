@@ -17,6 +17,7 @@ return {
   {
     "nvim-telescope/telescope.nvim",
     opts = function(_, opts)
+      opts.defaults.wrap_results = true
       vim.api.nvim_create_autocmd("User", {
         pattern = "TelescopePreviewerLoaded",
         callback = function()
