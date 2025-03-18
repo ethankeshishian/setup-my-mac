@@ -25,6 +25,7 @@ if [ -z "$HOMEBREW_PREFIX" ]; then
   export HOMEBREW_PREFIX="/opt/homebrew" # This is for M1 Macs
   echo 'export HOMEBREW_PREFIX="/opt/homebrew"' >> ~/.zshrc
 fi
+echo 'export EDITOR=nvim' >> ~/.zshrc
 brew install python
 brew tap homebrew/cask-fonts
 brew install --cask "font-martian-mono-nerd-font"
