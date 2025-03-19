@@ -14,6 +14,8 @@ map("n", "<leader>fr", "<cmd>Telescope lsp_references<CR>", { desc = "telescope 
 map("n", "<leader>se", "<cmd>lua vim.diagnostic.open_float()<CR>", { desc = "show diagnostic error" })
 map("n", "<leader>si", "<cmd>lua vim.lsp.buf.hover()<CR>", { desc = "show information" })
 map("n", "gp", "<cmd>lua vim.lsp.buf.type_definition()<CR>", { desc = "LSP Go to type definition" })
+map("n", "<leader>gp", "<cmd>Gitsigns nav_hunk prev<CR>", { desc = "Git Go to prev hunk" })
+map("n", "<leader>gn", "<cmd>Gitsigns nav_hunk next<CR>", { desc = "Git Go to next hunk" })
 
 -- map({ "n", "i", "v" }, "<C-s>", "<cmd> w <cr>")
 
