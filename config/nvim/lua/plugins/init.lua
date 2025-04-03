@@ -1,8 +1,8 @@
 return {
   {
     "stevearc/conform.nvim",
-    event = 'BufWritePre', -- uncomment for format on save
-  opts = require "configs.conform",
+    event = "BufWritePre", -- uncomment for format on save
+    opts = require "configs.conform",
   },
 
   -- These are some examples, uncomment them if you want to see them work!
@@ -27,16 +27,35 @@ return {
       })
       return opts
     end,
-  }
+  },
+
+  -- Preserve default opts while adding my own
+  {
+    "hrsh7th/nvim-cmp",
+    opts = function(_, opts)
+      local cmp = require "cmp"
+
+      opts.mapping = vim.tbl_deep_extend("force", opts.mapping or {}, {
+        ["<Esc>"] = cmp.mapping(function(fallback)
+          if cmp.visible() then
+            cmp.close()
+          else
+            fallback()
+          end
+        end, { "i", "s" }),
+      })
+
+      return opts
+    end,
+  },
 }
 
-  -- {
-  -- 	"nvim-treesitter/nvim-treesitter",
-  -- 	opts = {
-  -- 		ensure_installed = {
-  -- 			"vim", "lua", "vimdoc",
-  --      "html", "css"
-  -- 		},
-  -- 	},
-  -- },
-}
+-- {
+-- 	"nvim-treesitter/nvim-treesitter",
+-- 	opts = {
+-- 		ensure_installed = {
+-- 			"vim", "lua", "vimdoc",
+--      "html", "css"
+-- 		},
+-- 	},
+-- },
