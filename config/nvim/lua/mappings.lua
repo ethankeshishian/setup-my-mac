@@ -4,9 +4,10 @@ require "nvchad.mappings"
 
 local map = vim.keymap.set
 
-map("n", ";", ":", { desc = "CMD enter command mode" })
+-- map("n", ";", ":", { desc = "CMD enter command mode" })
 map("i", "jk", "<ESC>")
 map("i", "fp", "<ESC>")
+vim.keymap.set("n", "<C-a>", "<C-i>", { noremap = true, desc = "Jump forward in jumplist" })
 
 map("n", "<leader>fp", "<cmd>Telescope resume<CR>", { desc = "telescope resume" })
 map("n", "<leader>fe", "<cmd>Telescope diagnostics<CR>", { desc = "telescope find errors" })
