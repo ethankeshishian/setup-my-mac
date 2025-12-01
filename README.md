@@ -2,6 +2,9 @@
 
 This script is meant to setup my Mac. The goal is to provide a setup for homebrew, zsh, Neovim, kitty, productivity software, and applications.
 
+## Currently experimenting
+Zsh config. You will be able to remove certain installs from the shell installation. I added vivid and fzf, which you will need.
+
 ## Before install:
 - Follow the instructions [here](https://docs.github.com/en/get-started/git-basics/caching-your-github-credentials-in-git) to set up your personal access token. This will let you use Git and clone your nvim config.
 
