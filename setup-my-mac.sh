@@ -61,10 +61,11 @@ echo -e '\n' >> ~/.zshrc
 # Neovim
 brew install neovim
 brew install ripgrep
-git clone https://github.com/NvChad/starter ~/.config/nvim
-cp -rf ./config/nvim/init.lua ~/.config/nvim/
-cp -rf ./config/nvim/coc-settings.json ~/.config/nvim/
-cp -rf ./config/nvim/lua/* ~/.config/nvim/lua/
+git clone https://github.com/ethankeshishian/nvchad-starter ~/.config/nvim # might need to set up personal access token
+# git clone https://github.com/NvChad/starter ~/.config/nvim
+# cp -rf ./config/nvim/init.lua ~/.config/nvim/
+# cp -rf ./config/nvim/coc-settings.json ~/.config/nvim/
+# cp -rf ./config/nvim/lua/* ~/.config/nvim/lua/
 
 # Tmux
 brew install tmux
