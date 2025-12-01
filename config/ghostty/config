@@ -1,0 +1,9 @@
+theme = Catppuccin Mocha
+
+font-size = 14
+font-family = "MartianMono NFM"
+
+# keybindings
+keybind = cmd+s>r=reload_config
+keybind = cmd+s>x=close_surface
+keybind = shift+enter=text:\n
