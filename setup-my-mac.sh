@@ -45,6 +45,8 @@ brew install zsh-autocomplete
 brew install zsh-autosuggestions
 brew install zsh-syntax-highlighting
 brew install powerlevel10k
+brew install vivid
+brew install fzf
 brew install thefuck
 cp ./config/.p10k.zsh ~/
 echo '# Terminal' >> ~/.zshrc
