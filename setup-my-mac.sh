@@ -27,6 +27,7 @@ if [ -z "$HOMEBREW_PREFIX" ]; then
 fi
 echo 'export EDITOR=nvim' >> ~/.zshrc
 brew install python
+brew install git-town
 brew tap homebrew/cask-fonts
 brew install --cask "font-martian-mono-nerd-font"
 
@@ -36,7 +37,7 @@ kitten themes catppuccin-mocha
 cp -f ./config/kitty.conf ~/.config/kitty/
 
 # Terminal (ghostty)
-brew install --cask kitty
+brew install --cask ghostty
 cp -rf ./config/ghostty ~/.config/
 
 # Shell (zsh)
@@ -76,12 +77,12 @@ brew install tmux
 brew install tpm
 cp -f ./config/.tmux.conf ~/
 
-# Aliases
 echo '# Aliases' >> ~/.zshrc
 echo 'alias python=python3
 alias pip=pip3
 alias nv=nvim
-alias vim=nvim' >> ~/.zshrc
+alias vim=nvim
+alias switch="git town switch"' >> ~/.zshrc
 echo -e '\n' >> ~/.zshrc
 
 # Zsh behavior
