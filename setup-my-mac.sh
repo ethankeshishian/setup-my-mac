@@ -88,7 +88,8 @@ echo -e '\n' >> ~/.zshrc
 # Zsh behavior
 echo '# zsh behavior
 bindkey -v "^?" backward-delete-char
-KEYTIMEOUT=1' >> ~/.zshrc
+KEYTIMEOUT=1
+bindkey -M viins "\e\x7f" backward-kill-word' >> ~/.zshrc
 
 # Software
 brew install --cask mos # for smooth scrolling with mouse
