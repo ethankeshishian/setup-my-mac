@@ -35,6 +35,10 @@ brew install --cask kitty
 kitten themes catppuccin-mocha
 cp -f ./config/kitty.conf ~/.config/kitty/
 
+# Terminal (ghostty)
+brew install --cask kitty
+cp -rf ./config/ghostty ~/.config/
+
 # Shell (zsh)
 brew install zsh-autocomplete
 brew install zsh-autosuggestions
