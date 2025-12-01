@@ -1,4 +1,3 @@
--- load defaults i.e lua_lsp
 require("nvchad.configs.lspconfig").defaults()
 
 local nvlsp = require "nvchad.configs.lspconfig"
@@ -48,3 +47,4 @@ vim.lsp.config.static_ls = {
 }
 vim.lsp.enable("static_ls")
 
+-- read :h vim.lsp.config for changing options of lsp servers 

@@ -106,7 +106,9 @@ return {
 },
 
 
-  -- Preserve default opts while adding my own
+  -- test new blink
+  -- { import = "nvchad.blink.lazyspec" },
+
   -- {
   --   "hrsh7th/nvim-cmp",
   --   opts = function(_, opts)
