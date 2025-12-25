@@ -23,9 +23,7 @@ if ! command -v brew &> /dev/null; then
 fi
 if [ -z "$HOMEBREW_PREFIX" ]; then
   export HOMEBREW_PREFIX="/opt/homebrew" # This is for M1 Macs
-  echo 'export HOMEBREW_PREFIX="/opt/homebrew"' >> ~/.zshrc
 fi
-echo 'export EDITOR=nvim' >> ~/.zshrc
 brew install python
 brew install git-town
 brew tap homebrew/cask-fonts
@@ -47,23 +45,10 @@ brew install zsh-syntax-highlighting
 brew install powerlevel10k
 brew install vivid
 brew install fzf
+brew install zoxide
 brew install thefuck
-cp ./config/.p10k.zsh ~/
-echo '# Terminal' >> ~/.zshrc
-echo '# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
-# Initialization code that may require console input (password prompts, [y/n]
-# confirmations, etc.) must go above this block; everything else may go below.
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi' >> ~/.zshrc
-echo 'source /opt/homebrew/share/powerlevel10k/powerlevel10k.zsh-theme
-[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-source $HOMEBREW_PREFIX/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh
-source $HOMEBREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-source $HOMEBREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-eval $(thefuck --alias)
-alias ls="ls --color"' >> ~/.zshrc
-echo -e '\n' >> ~/.zshrc
+cp -f ./config/.p10k.zsh ~/
+cp -f ./config/.zshrc ~/
 
 # Neovim
 brew install neovim
@@ -78,20 +63,6 @@ git clone https://github.com/ethankeshishian/nvchad-starter ~/.config/nvim # mig
 brew install tmux
 brew install tpm
 cp -f ./config/.tmux.conf ~/
-
-echo '# Aliases' >> ~/.zshrc
-echo 'alias python=python3
-alias pip=pip3
-alias nv=nvim
-alias vim=nvim
-alias switch="git town switch"' >> ~/.zshrc
-echo -e '\n' >> ~/.zshrc
-
-# Zsh behavior
-echo '# zsh behavior
-bindkey -v "^?" backward-delete-char
-KEYTIMEOUT=1
-bindkey -M viins "\e\x7f" backward-kill-word' >> ~/.zshrc
 
 # Software
 brew install --cask mos # for smooth scrolling with mouse
