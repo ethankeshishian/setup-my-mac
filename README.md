@@ -1,94 +1,163 @@
 # setup-my-mac
 
-My Apple Silicon Macs, managed with nix-darwin, home-manager, and `smm`.
-The repository lives at `~/Repos/setup-my-mac`. Configs link directly into
-`config/`, so editing a linked file edits the repo. JSON manifests declare
-links, Nix packages, Homebrew packages, and 1Password secret references.
-Each host keeps its own `config/zsh/<host>.zshrc`; setup seeds a new host from
-its current `~/.zshrc` so local installers can continue appending to it.
-
-## Nix is handled for you
-
-You never run `nix` yourself. `smm setup` installs Nix if it's missing (or
-repairs a broken install), and on the first Mac it pins the flake inputs and
-commits `flake.lock`. Every later Mac gets that lock from the repo, so all
-Macs use the same versions. Mercury uses Lix, the other Mac uses Determinate Nix;
-set per host in `manifest/hosts.json`; setup installs or repairs the right one
-and never switches. Setup asks which implementation to use when registering a
-new host.
+`smm` manages Ethan's Apple Silicon Macs with nix-darwin and home-manager.
+The repo at `~/Repos/setup-my-mac` holds linked configs, package declarations,
+macOS defaults, app preferences, and references to secrets in 1Password.
+Editing a linked config edits the repo immediately; `smm apply` validates it
+and reloads the app. Setup is resumable and backs up local configs under
+`~/.smm-backup/<timestamp>/` before migration.
 
 ## New Mac
 
-On an arm64 Mac running macOS 27:
+On arm64 macOS 27:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ethankeshishian/setup-my-mac/main/bootstrap.sh | bash
 ```
 
-Bootstrap installs Nix with the Determinate installer if needed, loads its
-profile, clones this repo at the fixed path, and runs `smm setup` through Nix.
-Run `bash bootstrap.sh --dry-run` to preview its five steps. Rerunning bootstrap
-reuses the installation and checkout.
-
-Setup is resumable: fix a failed step and rerun `smm setup`. It backs up local
-configs under `~/.smm-backup/<timestamp>/`, compares them with the repo, and lets
-you keep either version or pick changes. Sign in to 1Password with CLI integration
-and GitHub through `gh auth login` when prompted. Skipping sign-in leaves a
-reported degraded state: weather is off or pushing is disabled. Permissions need
-your clicks; setup opens the settings panes. Any restart is offered once at the end.
+`bootstrap.sh` selects this host's Nix installer, loads its profile, clones the
+repo at the fixed path if needed, and launches setup. `bash bootstrap.sh --dry-run`
+prints its steps. An existing installation and checkout are reused.
 
 ## Existing Mac
 
-A Mac set up with the old script (no Nix yet) runs smm straight from the repo:
+From the checkout, run the CLI directly; Nix need not be installed beforehand:
 
 ```bash
 cd ~/Repos/setup-my-mac
-git pull
-smm/bin/smm setup --preview   # shows every difference, changes nothing
+smm/bin/smm setup --preview
 smm/bin/smm setup
 ```
 
-Setup installs Nix itself. After it finishes, `smm` is on PATH.
+Preview compares configs and inventories packages without changing them. Full
+setup currently requires branch `main`; merge the reviewed implementation there
+before the attended migration. Setup compares local configs with the repo, offers
+which changes to keep, builds replacements before removing duplicate Homebrew
+packages, and activates the links. After installation, `smm` is on PATH. Fix a
+failed step and rerun setup. Restart requests are collected for one final prompt.
+
+Nix implementation is per host in `manifest/hosts.json`: Mercury
+(`Ethans-MacBook-Pro-Mercury`) uses **Lix**; `Ethans-MacBook-Pro` uses
+**Determinate Nix**. Setup installs or repairs that implementation and never
+switches an existing installation to another. New hosts choose their implementation
+and get a host file plus their own zsh config. Setup automatically creates and
+commits `flake.lock` when missing; subsequent Macs share its pinned inputs.
 
 ## Commands
 
-| Command | When to use it | Behavior |
-| --- | --- | --- |
-| `smm setup` | Fresh Mac or migration | Compare, back up, build, link configs, guide permissions and sign-ins; safe to rerun. `--preview` shows differences first. |
-| `smm apply` | After editing configs | Validate, rebuild changed Nix inputs, activate and check health, then reload valid apps. Failed configs remain untouched and are reported. Versions stay pinned. |
-| `smm sync` | Moving between Macs | Validate local edits, prompt for a commit message (or use `-m "message"`), build and validate incoming changes in a temporary worktree, scan outgoing history, apply, then push. Conflicts require a choice. Offline runs stop before a local commit. |
-| `smm add <path>` | Keep a local config | Copy into `config/`, declare and link it, then apply. Use `--name <name>` to override the default name. Leaves changes uncommitted. |
-| `smm remove <name>` | Stop managing a config | Ask whether to keep a normal local copy or delete it, remove its declaration and repo source, then apply. Keeps a backup. |
-| `smm status` | Inspect changes and drift | Show uncommitted edits, ahead/behind commits, undeclared Homebrew packages, broken links and degraded sign-ins or secrets. |
-| `smm upgrade` | Deliberate version updates | Update Nix and nvim locks, validate and health-check, then commit the upgrade. Homebrew cask updates require confirmation. Starter template changes are review-only. |
-| `smm undo` | Undo an upgrade | Revert the latest unreverted upgrade commit, apply it, and restore pinned nvim plugins. Requires a clean tree. |
-| `smm validate [names...]` | Check configs | Run each declared validator, or a named subset. |
+| Command | Purpose |
+| --- | --- |
+| `smm setup [--preview]` | Set up or migrate a Mac; preview differences first and resume failed steps safely. |
+| `smm apply` | Validate configs, build and activate changed Nix inputs, check health, and reload valid apps. |
+| `smm sync [-m "message"]` | Commit valid edits, validate incoming changes, scan outgoing history, apply, and push; otherwise prompt for the message. |
+| `smm add <path> [--name <name>]` | Import a local config into the repo and link it, leaving changes uncommitted. |
+| `smm remove <name>` | Remove a managed config, choosing whether to retain a normal local copy. |
+| `smm status` | Show edits, ahead/behind commits, package drift, broken links, degraded setup, and stale Raycast exports. |
+| `smm upgrade` | Update Nix and nvim locks, validate, activate, and commit; offer Homebrew updates with confirmation. |
+| `smm undo` | Revert the latest unreverted upgrade and apply its locks; requires a clean working tree. |
+| `smm validate [names...]` | Validate all configs and app preference versions, or a subset such as `prefs`, `alttab`, or `raycast`. |
+| `smm capture <alttab\|raycast>` | Capture allowed live preferences and the installed app version into an uncommitted manifest. |
+| `smm raycast save <file.rayconfig>` | Save or replace a Raycast export in 1Password with its exporting version and export date. |
 
-`-y` accepts ordinary confirmations. It does **not** silently adopt or uninstall
-undeclared Homebrew packages; noninteractive runs warn and leave them alone.
-Secrets come from 1Password into ignored or out-of-repo files with mode 600,
-are cached between applies, and never belong in a commit. Outgoing history is
-scanned before pushing. Setup state lives under `~/.local/state/smm/`.
+The repo CLI supports the same commands as installed `smm`. Global `-y` accepts
+ordinary confirmations; it does not remove undeclared Homebrew packages, confirm
+AltTab permission grants, or acknowledge Raycast's import dialog. Setup state is
+under `~/.local/state/smm/`. Outgoing history is scanned before pushing.
 
-## Limits
+## Repository and ownership
 
-Homebrew casks are not pinned and cannot be rolled back. Self-updating apps can
-change independently of `smm`. macOS permissions require manual approval.
-Nix-managed state rolls back after activation or health failures; your own edits
-to linked configs are preserved. Apps that reload on save may see those edits
-before validation.
+| Path | Contents |
+| --- | --- |
+| `config/` | Live-editable configs linked by home-manager. |
+| `config/zsh/<host>.zshrc` | Each host's own `.zshrc`, seeded from its existing config during setup. |
+| `manifest/*.json` | Links, Nix packages, Homebrew packages, host implementations, secret references, and NvChad starter metadata. |
+| `manifest/prefs/<bundle-id>.json` | App name, captured version, and allowed preference keys. |
+| `modules/` | nix-darwin packages, defaults, preferences and services; home-manager links and tmux configuration. |
+| `hosts/` | Host identities and the new-host template. |
+| `smm/` | Bash CLI, command handlers, libraries, Nix package, and isolated bats tests. |
+| `flake.nix` | Nix inputs and host/package outputs; `flake.lock` is generated by setup. |
 
-## Remaining manual steps
+AeroSpace, SketchyBar, Ghostty, Karabiner, nvim, kitty, tmux, zsh, Powerlevel10k,
+and Mac Mouse Fix configs are linked into the checkout. Karabiner and nvim use
+directory links. Nix manages config-sensitive apps, CLI tools, language servers,
+the tmux theme, services, macOS defaults, and declared app preference keys.
+Homebrew manages the GUI casks in `manifest/homebrew.json`, including Raycast and
+Karabiner's driver-bearing app. Undeclared packages require an explicit decision;
+noninteractive runs leave them alone. Whimsy remains a separately installed browser.
 
-Sign in to the App Store and iCloud. Complete any skipped application sign-ins,
-and configure shortcuts inside apps such as Raycast and Alt-Tab. After nvim's
-history has been migrated and verified, archive `nvchad-starter` on GitHub yourself.
+## Secrets and Raycast
+
+Enable 1Password's CLI integration when setup asks. The weather secret reference
+is `op://smm/sketchybar-weather/env` in `manifest/secrets.json`; its contents are
+materialized as `~/.config/sketchybar/scripts/weather.env.sh` with mode 600. Setup
+can create the missing item. Existing secret files are cached between applies.
+Secret contents and Raycast exports never belong in this public repo.
+
+Raycast stays a Homebrew cask and self-updates: the installed baseline is
+2.11.1.0, while the considered Nix package is 2.10.1.0; downgrading risks its
+database. Only `raycastGlobalHotkey = Command-49` is declared in
+`manifest/prefs/com.raycast.macos.json`. Its version validator accepts an installed
+version equal to or newer than the captured version.
+
+For per-command hotkeys, aliases, quicklinks, and snippets, export a password
+protected `.rayconfig` from Raycast to a location **outside this repo**, then run
+`smm raycast save <file.rayconfig>`. This creates or replaces the `raycast-config`
+Document in vault `smm`, tagged with the installed Raycast version and export date.
+The save command refuses repo paths, including symlinks into the repo. The
+original exported file remains yours to remove after saving it securely.
+
+Setup's `raycast` step follows sign-in. It downloads the current document to a
+mode-600 temporary `.rayconfig`, requires Raycast to be at least the exporting
+version, and opens the import dialog. Enter the export password there, finish
+importing, then answer **Imported?** Setup records that document revision and
+cleans up the temporary file even on cancellation. A new document revision
+requires another import. Signed-out 1Password or a missing document skips the
+step with a degraded note. The save command creates vault `smm` if it is missing. `smm status` reminds you to
+re-export when the saved snapshot is older than 30 days.
+
+## AltTab preferences
+
+AltTab stays on Homebrew's `alt-tab` cask at `/Applications/AltTab.app`.
+This Mac keeps its self-updated **10.12.0** installation, frozen with update
+checks and automatic updates off (`updatePolicy = "0"`,
+`SUEnableAutomaticChecks = false`, and `SUAutomaticallyUpdate = false`).
+Setup leaves the existing cask installed.
+
+`manifest/prefs/com.lwouis.alt-tab-macos.json` contains allow-listed user-facing
+settings captured from **10.12.0**. Telemetry, identifiers, window geometry,
+migration metadata, dates, and blobs are excluded. The version check requires
+exact equality. AltTab 10.12.0 is no longer downloadable: a new Mac gets the
+current Homebrew cask, and smm reports the version mismatch. Open AltTab, check
+its settings, then run `smm capture alttab` to capture that Mac's version and
+review the updated manifest. Capture keeps update checks and automatic updates off.
+
+After applying changed preference manifests, smm relaunches the affected apps
+only if they are running. AltTab needs **Accessibility and Screen Recording**;
+setup opens both panes and asks you to confirm both grants.
+
+## Limits and remaining manual steps
+
+Homebrew casks are not pinned and cannot be rolled back. Self-updating apps can change between
+runs. Raycast exports are snapshots: changes since the last export are absent
+until you export and save again. macOS privacy permissions require clicks;
+smm cannot grant them. A rollback restores Nix-managed state while preserving
+your own config edits; apps that reload on save may see those edits before
+validation. Nix evaluation, builds, real app validators, and the attended
+migration still need verification on a Nix-equipped Mac.
+
+Complete App Store and iCloud sign-ins, application account sign-ins, any skipped
+1Password/GitHub sign-in, permission approvals, and Raycast's password/import
+dialog. Check AltTab settings. Archive `nvchad-starter` on GitHub yourself
+after its imported history and config are verified.
+
+`setup-my-mac.sh` is retired; use `smm`.
 
 ## Development
 
-Run `bats smm/tests` and
-`shellcheck -x smm/bin/smm smm/lib/*.sh smm/cmd/*.sh bootstrap.sh setup-my-mac.sh`.
-Tests isolate HOME and stub system tools; Nix evaluation tests skip when Nix is
-unavailable. The CLI also runs directly as `smm/bin/smm`. Nix builds, stable-package
-validation and the attended migration must be verified on a Nix-equipped Mac
-before using setup on the live machine.
+```bash
+bats smm/tests
+shellcheck -x smm/bin/smm smm/lib/*.sh smm/cmd/*.sh
+```
+
+Tests use temporary HOME directories and PATH stubs for system tools. Nix
+evaluation tests skip with `nix not installed` when Nix is absent.
