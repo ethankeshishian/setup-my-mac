@@ -1,3 +1,6 @@
+config-version = 2
+persistent-workspaces = ["1", "2", "3", "4", "5", "6", "7", "8"]
+
 # Place a copy of this config to ~/.aerospace.toml
 # After that, you can edit ~/.aerospace.toml to your liking
 
@@ -9,18 +12,14 @@ after-login-command = []
 # You can use it to add commands that run after AeroSpace startup.
 # 'after-startup-command' is run after 'after-login-command'
 # Available commands : https://nikitabobko.github.io/AeroSpace/commands
-after-startup-command = [
-  # 'exec-and-forget borders active_color=0xFFCE3A5B inactive_color=0x40CE3A5B width=12.0',
-  'exec-and-forget borders active_color=0xff3a6aff inactive_color=0x00494d64 width=12.0',
-  'exec-and-forget sketchybar'
-]
+after-startup-command = []
 
 exec-on-workspace-change = ['/bin/bash', '-c',
     'sketchybar --trigger aerospace_workspace_change FOCUSED_WORKSPACE=$AEROSPACE_FOCUSED_WORKSPACE'
 ]
 
 # Start AeroSpace at login
-start-at-login = true
+start-at-login = false
 
 # Normalizations. See: https://nikitabobko.github.io/AeroSpace/guide#normalization
 enable-normalization-flatten-containers = true
