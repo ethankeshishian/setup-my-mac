@@ -66,25 +66,69 @@ step_preflight_done() {
 step_preflight_run() {
   step_preflight_done || { warn 'requires arm64, ~/Repos/setup-my-mac, and branch main'; return 1; }
 }
+# Override only in isolated tests; production uses the installer's fixed paths.
+smm_nix_root() { printf '%s\n' "${SMM_NIX_ROOT:-/nix}"; }
+smm_nix_is_lix() { smm_nix --version 2>/dev/null | grep -qi lix; }
 step_nix_done() {
-  command -v nix >/dev/null 2>&1 && nix --version >/dev/null 2>&1 && nix store ping --store daemon >/dev/null 2>&1
+  local state
+  command -v nix >/dev/null 2>&1 && smm_nix --version >/dev/null 2>&1 || return 1
+  if smm_nix_is_lix; then
+    state=$(smm_state_dir) || return 1
+    [ -f "$state/nix-impl" ] && [ "$(cat "$state/nix-impl")" = lix ] || return 1
+  fi
+  smm_nix store ping --store daemon >/dev/null 2>&1
 }
+smm_install_determinate() (
+  tmp=$(mktemp -d) || exit 1
+  trap 'rm -rf "$tmp"' EXIT
+  curl -fsSL https://install.determinate.systems/nix -o "$tmp/installer" || exit 1
+  sh "$tmp/installer" install
+)
 step_nix_run() {
-  if [ -x /nix/nix-installer ]; then
-    /nix/nix-installer repair || return 1
+  local root state answer switched=0
+  root=$(smm_nix_root) || return 1
+  state=$(smm_state_dir) || return 1
+  if smm_nix_is_lix; then
+    if [ -f "$state/nix-impl" ] && [ "$(cat "$state/nix-impl")" = lix ]; then
+      smm_nix store ping --store daemon || { warn 'Lix daemon is unavailable; repair Lix before rerunning setup'; return 1; }
+      return 0
+    fi
+    log 'Lix detected. Current packages (nix profile list):'
+    smm_nix profile list || warn 'could not list the modern Nix profile'
+    log 'Legacy packages (nix-env -q; separate from nix profile list):'
+    nix-env -q || warn 'nix-env -q unavailable or no legacy profile'
+    answer=$(choose 'Choose Nix implementation' 'keep Lix' 'switch to Determinate Nix') || return 1
+    case "$answer" in
+      'keep Lix')
+        smm_nix store ping --store daemon || { warn 'Lix daemon is unavailable; repair Lix before rerunning setup'; return 1; }
+        printf 'lix\n' > "$state/nix-impl"
+        return "$?" ;;
+      'switch to Determinate Nix')
+        if [ ! -x "$root/lix-installer" ]; then
+          warn 'Lix uninstaller missing. Follow https://docs.lix.systems/manual/lix/stable/installation/uninstall.html then rerun setup; smm will not delete /nix.'
+          return 1
+        fi
+        "$root/lix-installer" uninstall || return 1
+        switched=1
+        # A Determinate receipt left by a former installation is not a repair path.
+        smm_install_determinate || return 1 ;;
+      *) return 1 ;;
+    esac
+  elif [ -x "$root/nix-installer" ]; then
+    "$root/nix-installer" repair || return 1
   else
-    (
-      tmp=$(mktemp -d) || exit 1
-      trap 'rm -rf "$tmp"' EXIT
-      curl -fsSL https://install.determinate.systems/nix -o "$tmp/installer" || exit 1
-      sh "$tmp/installer" install
-    ) || return 1
+    smm_install_determinate || return 1
   fi
-  if ! command -v nix >/dev/null 2>&1 && [ -f /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
+  if ! command -v nix >/dev/null 2>&1 && [ -f "$root/var/nix/profiles/default/etc/profile.d/nix-daemon.sh" ]; then
     # shellcheck source=/dev/null
-    source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+    source "$root/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
   fi
-  step_nix_done
+  if [ "$switched" -eq 1 ] && smm_nix_is_lix; then
+    warn 'Lix is still on PATH; open a new shell and rerun setup'
+    return 1
+  fi
+  step_nix_done || return 1
+  printf 'determinate\n' > "$state/nix-impl"
 }
 
 # The first Mac pins the flake inputs; every later Mac gets flake.lock from the repo.
@@ -94,7 +138,7 @@ step_lock_done() {
 step_lock_run() {
   local repo
   repo=$(smm_repo)
-  (cd "$repo" && nix flake lock) || return 1
+  (cd "$repo" && smm_nix flake lock) || return 1
   git -C "$repo" add flake.lock &&
     git -C "$repo" commit -q -m 'Pin Nix inputs' -- flake.lock || return 1
   step_lock_done
@@ -103,8 +147,20 @@ step_lock_run() {
 step_host_done() {
   local host
   host=$(smm_host) || return 1
-  [ -f "$(smm_repo)/hosts/$host.nix" ] && [ "$host" != template ] &&
+  [ -f "$(smm_repo)/config/zsh/$host.zshrc" ] &&
+    [ -f "$(smm_repo)/hosts/$host.nix" ] && [ "$host" != template ] &&
     git -C "$(smm_repo)" ls-files --error-unmatch "hosts/$host.nix" >/dev/null 2>&1
+}
+smm_seed_host_zsh() {
+  local host=$1 repo file
+  case "$host" in ''|-*|*[!a-zA-Z0-9-]*) warn 'invalid host name'; return 1 ;; esac
+  repo=$(smm_repo) || return 1
+  file="config/zsh/$host.zshrc"
+  smm_config_source_safe "$file" || return 1
+  [ ! -e "$repo/$file" ] || return 0
+  mkdir -p "$repo/config/zsh" || return 1
+  if [ -f "$HOME/.zshrc" ]; then cp "$HOME/.zshrc" "$repo/$file";
+  else printf '# Host-specific zsh configuration for %s\n' "$host" > "$repo/$file"; fi
 }
 step_host_run() {
   local current host repo
@@ -117,6 +173,7 @@ step_host_run() {
   if [ ! -f "$repo/hosts/$host.nix" ]; then
     sed "s/HOSTNAME/$host/g" "$repo/hosts/template.nix" > "$repo/hosts/$host.nix" || return 1
   fi
+  smm_seed_host_zsh "$host" || return 1
   # Git flakes exclude untracked host files. Commit only this host, leaving
   # any interrupted migration changes for the final setup commit.
   if ! git -C "$repo" ls-files --error-unmatch "hosts/$host.nix" >/dev/null 2>&1; then
@@ -146,7 +203,7 @@ step_configs_run() {
     target=$(link_field "$name" target) || return 1
     smm_safe_relative "$target" || return 1
     smm_tx_watch "$HOME/$target" target || return 1
-    source=$(link_field "$name" source) || return 1
+    source=$(link_source "$name") || return 1
     smm_config_source_safe "$source" || return 1
     if [ "$status" != linked ] && [ "$status" != missing ]; then
       smm_tx_arm "$(smm_repo)/$source" || return 1

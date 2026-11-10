@@ -37,7 +37,7 @@ smm_rebuild() {
     generation=$(smm_generation) || return 1
     if [ -n "$generation" ]; then darwin-rebuild "$@"; return "$?"; fi
   fi
-  nix run "$(smm_repo)#darwin-rebuild" -- "$@"
+  smm_nix run "$(smm_repo)#darwin-rebuild" -- "$@"
 }
 smm_rebuild_sudo() {
   local generation
@@ -45,7 +45,7 @@ smm_rebuild_sudo() {
     generation=$(smm_generation) || return 1
     if [ -n "$generation" ]; then sudo darwin-rebuild "$@"; return "$?"; fi
   fi
-  sudo nix run "$(smm_repo)#darwin-rebuild" -- "$@"
+  smm_nix --sudo run "$(smm_repo)#darwin-rebuild" -- "$@"
 }
 
 smm_generation() {

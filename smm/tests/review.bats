@@ -151,8 +151,8 @@ if [ "$1" = switch ] && [ "$2" = --flake ]; then kill -TERM "$PPID"; fi\
   stub nix 0
   smm_build
   smm_switch
-  calls | grep -qx "nix run $SMM_REPO#darwin-rebuild -- build --flake $SMM_REPO#Test-Mac"
-  calls | grep -qx "nix run $SMM_REPO#darwin-rebuild -- switch --flake $SMM_REPO#Test-Mac"
+  calls | grep -qx "nix --extra-experimental-features nix-command flakes run $SMM_REPO#darwin-rebuild -- build --flake $SMM_REPO#Test-Mac"
+  calls | grep -qx "nix --extra-experimental-features nix-command flakes run $SMM_REPO#darwin-rebuild -- switch --flake $SMM_REPO#Test-Mac"
 }
 @test "review 10 absent brew is empty inventory for preview and adoption" {
   command() {
@@ -270,6 +270,6 @@ if [ "$1" = switch ] && [ "$2" = --flake ]; then kill -TERM "$PPID"; fi\
   stub nix 0
   smm_build
   smm_switch
-  calls | grep -qx "nix run $SMM_REPO#darwin-rebuild -- build --flake $SMM_REPO#Test-Mac"
-  calls | grep -qx "nix run $SMM_REPO#darwin-rebuild -- switch --flake $SMM_REPO#Test-Mac"
+  calls | grep -qx "nix --extra-experimental-features nix-command flakes run $SMM_REPO#darwin-rebuild -- build --flake $SMM_REPO#Test-Mac"
+  calls | grep -qx "nix --extra-experimental-features nix-command flakes run $SMM_REPO#darwin-rebuild -- switch --flake $SMM_REPO#Test-Mac"
 }

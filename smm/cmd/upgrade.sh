@@ -74,7 +74,7 @@ cmd_upgrade() (
   trap smm_upgrade_cleanup EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
-  nix flake update || exit 1
+  smm_nix flake update || exit 1
   smm_nvim_run '+Lazy! update' && validate_nvim "$repo/config/nvim" || exit 1
   smm_upgrade_reviews || exit 1
   prev=$(smm_generation) || exit 1
