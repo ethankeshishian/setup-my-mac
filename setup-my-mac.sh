@@ -7,6 +7,7 @@ defaults write com.apple.dock autohide-time-modifier -float 0.4
 defaults write com.apple.dock wvous-bl-corner -int 4
 defaults write com.apple.dock wvous-br-modifier -int 1048576
 defaults write com.apple.dock show-recents -bool FALSE
+defaults write com.apple.dock expose-group-apps -bool true # Mission Control works with AeroSpace's hidden windows
 killall Dock
 defaults write NSGlobalDomain _HIHideMenuBar -bool true
 defaults write com.apple.AppleMultitouchTrackpad DragLock -bool false # three finger drag
@@ -91,7 +92,10 @@ brew install --cask raycast
 brew install --cask nikitabobko/tap/aerospace
 brew tap FelixKratz/formulae
 brew install borders
+brew install sketchybar
 cp -f ./config/.aerospace.toml ~/
+mkdir -p ~/.config
+cp -rf ./config/sketchybar ~/.config/
 brew install --cask karabiner-elements
 cp -f ./config/karabiner.json ~/.config/karabiner/
 
