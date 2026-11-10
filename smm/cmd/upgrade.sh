@@ -81,6 +81,7 @@ cmd_upgrade() (
   smm_build && smm_use_build_tools && smm_run_validate "$repo" || exit 1
   switched=1
   smm_switch || exit 1
+  smm_validate_prefs "$repo" || exit 1
   if ! smm_health; then
     if [ "$(smm_health_reason aerospace)" = no-accessibility ]; then
       smm_wait_permission aerospace && smm_health || exit 1

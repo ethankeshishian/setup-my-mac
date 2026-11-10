@@ -39,6 +39,9 @@ cmd_status() {
     changes="${changes}1Password not signed in (weather disabled)"$'\n'
   fi
   if [ -n "$changes" ]; then printf 'degraded items:\n%s' "$changes"; any=1; fi
+  if [ -s "$(smm_state_dir)/raycast-skipped" ]; then cat "$(smm_state_dir)/raycast-skipped"; any=1; fi
+  changes=$(smm_raycast_reminder) || return 1
+  if [ -n "$changes" ]; then printf '%s\n' "$changes"; any=1; fi
   [ "$any" -ne 0 ] || printf 'clean\n'
   return 0
 }

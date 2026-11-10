@@ -160,3 +160,28 @@ if [[ "$*" == *--dry-run* ]]; then echo broken; exit 1; fi\
   [[ "$output" == *'undeclared Homebrew packages:'*'brew example'* ]]
   [[ "$output" == *'missing secret: weather'* ]]
 }
+
+@test "apply relaunches changed running prefs after switch and skips next unchanged apply" {
+  mkdir -p "$SMM_REPO/manifest/prefs" "$SMM_APPLICATIONS_DIR/AltTab.app/Contents"
+  echo plist > "$SMM_APPLICATIONS_DIR/AltTab.app/Contents/Info.plist"
+  echo '{"app":"AltTab","captured_version":"10.12.0","keys":{"theme":"0"}}' > "$SMM_REPO/manifest/prefs/com.lwouis.alt-tab-macos.json"
+  stub plutil 0 10.12.0; stub osascript 0; stub open 0
+  run /bin/bash "$REPO/smm/bin/smm" apply; [ "$status" -eq 0 ]
+  calls | grep -qx 'open -a AltTab'
+  switch_line=$(calls | awk '/^darwin-rebuild switch --flake/ {print NR}')
+  open_line=$(calls | awk '/^open -a AltTab$/ {print NR}')
+  [ "$open_line" -gt "$switch_line" ]
+  : > "$TMP/calls.log"
+  run "$REPO/smm/bin/smm" apply; [ "$status" -eq 0 ]
+  ! calls | grep -q '^open '
+}
+@test "failed build never relaunches preferences apps" {
+  mkdir -p "$SMM_REPO/manifest/prefs" "$SMM_APPLICATIONS_DIR/AltTab.app/Contents"
+  echo plist > "$SMM_APPLICATIONS_DIR/AltTab.app/Contents/Info.plist"
+  echo '{"app":"AltTab","captured_version":"10.12.0","keys":{}}' > "$SMM_REPO/manifest/prefs/com.lwouis.alt-tab-macos.json"
+  stub plutil 0 10.12.0
+  stub darwin-rebuild 1
+  run "$REPO/smm/bin/smm" apply; [ "$status" -eq 1 ]
+  ! calls | grep -q '^open '
+  [ ! -d "$SMM_STATE/prefs" ]
+}

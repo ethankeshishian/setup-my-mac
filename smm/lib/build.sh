@@ -19,7 +19,7 @@ smm_nix_inputs_hash() (
     for dir in hosts modules smm; do
       [ ! -d "$dir" ] || find "$dir" -type f -print
     done
-    for file in manifest/*.json; do [ ! -f "$file" ] || printf '%s\n' "$file"; done
+    for file in manifest/*.json manifest/prefs/*.json; do [ ! -f "$file" ] || printf '%s\n' "$file"; done
   } | LC_ALL=C sort | while IFS= read -r file; do
     shasum -a 256 "$file" || exit 1
   done | shasum -a 256 | awk '{print $1}'

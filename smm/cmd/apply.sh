@@ -70,6 +70,7 @@ cmd_apply() (
     SMM_SKIP_AEROSPACE=1 smm_run_validate "$(smm_repo)" || exit 1
     switching=1
     smm_switch || { warn 'switch failed; rolling back'; exit 1; }
+    smm_validate_prefs "$(smm_repo)" || exit 1
     smm_run_validate "$(smm_repo)" aerospace || exit 1
     if ! smm_health; then
       if [ "$(smm_health_reason aerospace)" = no-accessibility ]; then
@@ -89,6 +90,8 @@ cmd_apply() (
     cp "$(smm_repo)/config/nvim/lazy-lock.json" "$state/lazy-lock.json" || exit 1
     printf '%s\n' "$lock_hash" > "$state/lazy-lock.hash" || exit 1
   fi
-  if [ "$switching" -eq 1 ]; then smm_finalize_apply || exit 1; fi
+  if [ "$switching" -eq 1 ]; then
+    smm_prefs_relaunch && smm_finalize_apply || exit 1
+  fi
   complete=1
 )

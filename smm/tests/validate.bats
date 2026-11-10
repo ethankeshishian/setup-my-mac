@@ -17,6 +17,7 @@ JSON
 load_lib() {
   source "$REPO/smm/lib/common.sh"
   source "$REPO/smm/lib/validate.sh"
+  source "$REPO/smm/lib/prefs.sh"
 }
 @test "reports fail with first error line" {
   stub ghostty 1 $'bad key\nsecond error'

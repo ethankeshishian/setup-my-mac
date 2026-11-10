@@ -2,7 +2,7 @@
 
 smm_setup_steps() {
   # shellcheck disable=SC2034 # Consumed by cmd_setup in cmd/setup.sh.
-  SETUP_STEPS=(preflight host nix lock preview configs brew_adopt build dedupe switch permissions signin secrets nvim health commit finish)
+  SETUP_STEPS=(preflight host nix lock preview configs brew_adopt build dedupe switch permissions signin raycast secrets nvim health commit finish)
 }
 
 smm_permission_granted() {
@@ -12,6 +12,7 @@ smm_permission_granted() {
       local extensions
       extensions=$(systemextensionsctl list 2>/dev/null) || return "$?"
       grep -Eiq 'pqrs.*\[activated enabled\]' <<< "$extensions" ;;
+    alttab) return 2 ;; # macOS has no reliable per-app TCC query; confirm both grants.
     *) return 2 ;;
   esac
 }
@@ -20,6 +21,12 @@ smm_wait_permission() {
   case "$app" in
     aerospace) checker=aerospace; label=Accessibility ;;
     karabiner) checker=systemextensionsctl; label='driver approval and Input Monitoring' ;;
+    alttab)
+      warn 'Grant AltTab Accessibility AND Screen Recording in System Settings.'
+      open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility' || return 1
+      open 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture' || return 1
+      SMM_YES=0 confirm 'AltTab has Accessibility AND Screen Recording. Done?'
+      return "$?" ;;
     *) warn "unknown permission check: $app"; return 2 ;;
   esac
   smm_permission_granted "$app" && return 0
@@ -301,7 +308,8 @@ smm_setup_restore_brew() {
   while IFS=' ' read -r kind name; do
     case "$kind" in
       brew) brew install "$name" && brew services start "$name" || failed=1 ;;
-      cask) brew install --cask "$name" && open -a "$name" || failed=1 ;;
+      cask)
+        brew install --cask "$name" && open -a "$name" || failed=1 ;;
       *) failed=1 ;;
     esac
   done < "$file"
@@ -335,7 +343,7 @@ step_configs_linked() {
 step_switch_run() {
   local state prev names name target
   state=$(smm_state_dir) || return 1
-  smm_use_build_tools && SMM_SKIP_AEROSPACE=1 smm_run_validate "$(smm_repo)" || return 1
+  smm_use_build_tools && SMM_SKIP_PREFS=1 SMM_SKIP_AEROSPACE=1 smm_run_validate "$(smm_repo)" || return 1
   if [ -n "${SMM_TX:-}" ]; then
     # The configs step can be skipped on a fresh Mac. Journal absent targets too.
     names=$(link_names) || return 1
@@ -351,14 +359,20 @@ step_switch_run() {
     smm_tx_arm "$state/applied.hash" && smm_tx_clear_targets || return 1
   fi
   if ! smm_switch; then smm_setup_recover || warn 'recovery incomplete'; return 1; fi
+  smm_validate_prefs "$(smm_repo)" || return 1
+  smm_prefs_relaunch || return 1
   smm_run_validate "$(smm_repo)" aerospace || return 1
   smm_need_restart 'macOS menu bar and symbolic hotkey defaults' || return 1
 }
 
-step_permissions_done() { smm_permission_granted aerospace && smm_permission_granted karabiner; }
+step_permissions_done() {
+  smm_permission_granted aerospace && smm_permission_granted karabiner || return 1
+  ! smm_app_bundle alttab >/dev/null
+}
 step_permissions_run() {
   smm_wait_permission aerospace || return 1
-  smm_wait_permission karabiner
+  smm_wait_permission karabiner || return 1
+  if smm_app_bundle alttab >/dev/null; then smm_wait_permission alttab; fi
 }
 step_signin_done() { op whoami >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; }
 step_signin_run() {
@@ -482,6 +496,7 @@ step_finish_run() {
   log 'Setup complete. Still manual: App Store and iCloud sign-in.'
   [ ! -s "$state/signin-skipped" ] || cat "$state/signin-skipped"
   [ ! -s "$state/secrets-skipped" ] || cat "$state/secrets-skipped"
+  [ ! -s "$state/raycast-skipped" ] || cat "$state/raycast-skipped"
   if smm_restart_pending; then
     log 'Restart needed:'; cat "$state/restart-needed"
     if confirm 'Restart now?'; then osascript -e 'tell app "System Events" to restart'; fi

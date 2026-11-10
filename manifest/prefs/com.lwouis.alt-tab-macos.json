@@ -1,0 +1,33 @@
+{
+  "app": "AltTab",
+  "captured_version": "10.12.0",
+  "keys": {
+    "alignThumbnails": "1",
+    "appearanceVisibility": "0",
+    "appsToShow": "0",
+    "crashPolicy": "1",
+    "hideAppBadges": "false",
+    "hideColoredCircles": "false",
+    "hideSpaceNumberLabels": "true",
+    "hideThumbnails": "false",
+    "hideWindowlessApps": "true",
+    "menubarIcon": "0",
+    "menubarIconShown": "false",
+    "screensToShow": "1",
+    "shortcutCount": "3",
+    "showFullscreenWindows": "1",
+    "showHiddenWindows": "1",
+    "showMinimizedWindows": "1",
+    "showOnScreen": "1",
+    "showWindowlessApps": "1",
+    "showWindowlessApps10": "1",
+    "showWindowlessApps2": "1",
+    "showWindowlessApps3": "1",
+    "theme": "0",
+    "titleTruncation": "2",
+    "updatePolicy": "0",
+    "windowMaxWidthInRow": "30",
+    "SUEnableAutomaticChecks": false,
+    "SUAutomaticallyUpdate": false
+  }
+}

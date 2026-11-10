@@ -27,6 +27,7 @@ smm_validate() {
     SMM_FAILED_LINKS="${SMM_FAILED_LINKS:+$SMM_FAILED_LINKS }$name"
     failed=1
   done <<< "$entries"
+  smm_validate_prefs "$root" "$@" || failed=1
   return "$failed"
 }
 

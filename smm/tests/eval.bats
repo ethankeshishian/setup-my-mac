@@ -158,3 +158,10 @@ eval_raw() {
     [[ "$output" != *'{host}'* ]]
   done
 }
+
+@test "app preferences come from versioned manifests" {
+  eval_json 'system.defaults.CustomUserPreferences."com.lwouis.alt-tab-macos"'
+  [ "$(jq -cS . <<< "$output")" = "$(jq -cS .keys "$REPO/manifest/prefs/com.lwouis.alt-tab-macos.json")" ]
+  eval_json 'system.defaults.CustomUserPreferences."com.raycast.macos"'
+  [ "$(jq -cS . <<< "$output")" = '{"raycastGlobalHotkey":"Command-49"}' ]
+}
