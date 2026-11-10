@@ -2,6 +2,7 @@
   imports = [
     ./packages.nix
     ./homebrew.nix
+    ./alttab.nix
     ./prefs.nix
     ./defaults.nix
     ./services.nix

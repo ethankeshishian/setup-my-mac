@@ -320,6 +320,8 @@ step_dedupe_done() {
   duplicates=$(smm_brew_duplicates) || return 1
   [ -z "$duplicates" ]
 }
+# Cask token -> the app name macOS knows it by.
+smm_cask_app() { case "$1" in alt-tab) echo AltTab ;; aerospace) echo AeroSpace ;; *) echo "$1" ;; esac; }
 step_dedupe_run() {
   local duplicates kind name file
   duplicates=$(smm_brew_duplicates) || return 1
@@ -331,7 +333,7 @@ step_dedupe_run() {
     case "$kind" in
       brew) brew services stop "$name" || :; HOMEBREW_NO_AUTOREMOVE=1 brew uninstall "$name" || return 1 ;;
       cask)
-        osascript -e 'on run argv' -e 'tell application (item 1 of argv) to quit' -e 'end run' "$name" || :
+        osascript -e 'on run argv' -e 'tell application (item 1 of argv) to quit' -e 'end run' "$(smm_cask_app "$name")" || :
         HOMEBREW_NO_AUTOREMOVE=1 brew uninstall --cask "$name" || return 1 ;;
       *) return 1 ;;
     esac
@@ -345,7 +347,7 @@ smm_setup_restore_brew() {
     case "$kind" in
       brew) brew install "$name" && brew services start "$name" || failed=1 ;;
       cask)
-        brew install --cask "$name" && open -a "$name" || failed=1 ;;
+        brew install --cask "$name" && open -a "$(smm_cask_app "$name")" || failed=1 ;;
       *) failed=1 ;;
     esac
   done < "$file"
@@ -408,7 +410,8 @@ step_permissions_done() {
 step_permissions_run() {
   smm_wait_permission aerospace || return 1
   smm_wait_permission karabiner || return 1
-  if smm_app_bundle alttab >/dev/null; then smm_wait_permission alttab; fi
+  # Start the Nix-installed AltTab so it can ask for, and use, its permissions.
+  if smm_app_bundle alttab >/dev/null; then open -a "$(smm_app_bundle alttab)" || :; smm_wait_permission alttab; fi
 }
 step_signin_done() { op whoami >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; }
 step_signin_run() {

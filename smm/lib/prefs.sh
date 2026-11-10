@@ -16,7 +16,9 @@ smm_prefs_app() {
 smm_app_bundle() {
   local apps=${SMM_APPLICATIONS_DIR:-/Applications} app
   app=$(smm_prefs_app "$1") || return 2
-  if [ -d "$apps/$app.app" ]; then printf '%s/%s.app\n' "$apps" "$app";
+  # Nix-installed apps (AltTab) land in "Nix Apps"; Homebrew ones in Applications.
+  if [ -d "$apps/Nix Apps/$app.app" ]; then printf '%s/Nix Apps/%s.app\n' "$apps" "$app";
+  elif [ -d "$apps/$app.app" ]; then printf '%s/%s.app\n' "$apps" "$app";
   else return 1; fi
 }
 smm_app_version() {

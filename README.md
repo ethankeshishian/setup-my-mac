@@ -21,7 +21,9 @@ prints its steps. An existing installation and checkout are reused.
 
 ## Existing Mac
 
-From the checkout, run the CLI directly; Nix need not be installed beforehand:
+From the checkout, run the CLI directly; Nix need not be installed beforehand.
+`--preview` only reports what would change: it doesn't check or install Nix and
+doesn't create `flake.lock`. The real `smm setup` does both.
 
 ```bash
 cd ~/Repos/setup-my-mac
@@ -121,25 +123,23 @@ requires another import. Signed-out 1Password or a missing document skips the
 step with a degraded note. The save command creates vault `smm` if it is missing. `smm status` reminds you to
 re-export when the saved snapshot is older than 30 days.
 
-## AltTab preferences
+## AltTab
 
-AltTab stays on Homebrew's `alt-tab` cask at `/Applications/AltTab.app`.
-This Mac keeps its self-updated **10.12.0** installation, frozen with update
-checks and automatic updates off (`updatePolicy = "0"`,
-`SUEnableAutomaticChecks = false`, and `SUAutomaticallyUpdate = false`).
-Setup leaves the existing cask installed.
+AltTab is pinned at **10.12.0** and installed by Nix on every Mac
+(`modules/darwin/alttab.nix`, into `/Applications/Nix Apps`). Upstream no
+longer hosts that version, so the Nix package downloads the unmodified,
+notarized app from this repo's
+[`alttab-10.12.0` release](https://github.com/ethankeshishian/setup-my-mac/releases/tag/alttab-10.12.0)
+and checks its hash. It keeps its developer signature, so macOS permissions
+stick. AltTab is GPL-3.0; the source for this version is
+<https://github.com/lwouis/alt-tab-macos/tree/v10.12.0>. Setup removes the
+Homebrew `alt-tab` cask only after the Nix build succeeds.
 
-`manifest/prefs/com.lwouis.alt-tab-macos.json` contains allow-listed user-facing
-settings captured from **10.12.0**. Telemetry, identifiers, window geometry,
-migration metadata, dates, and blobs are excluded. The version check requires
-exact equality. AltTab 10.12.0 is no longer downloadable: a new Mac gets the
-current Homebrew cask, and smm reports the version mismatch. Open AltTab, check
-its settings, then run `smm capture alttab` to capture that Mac's version and
-review the updated manifest. Capture keeps update checks and automatic updates off.
-
-After applying changed preference manifests, smm relaunches the affected apps
-only if they are running. AltTab needs **Accessibility and Screen Recording**;
-setup opens both panes and asks you to confirm both grants.
+`manifest/prefs/com.lwouis.alt-tab-macos.json` holds the allow-listed,
+user-facing settings captured from 10.12.0, with update checks and automatic
+updates off. Telemetry, identifiers, window geometry, dates and blobs are left
+out. The version check requires an exact match; after an intentional AltTab
+upgrade, check its settings and run `smm capture alttab`.
 
 ## Limits and remaining manual steps
 

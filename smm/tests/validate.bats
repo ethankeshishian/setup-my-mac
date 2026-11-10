@@ -154,3 +154,60 @@ STUB
   [ "$(cat "$HOME/.aerospace.toml")" = original ]
   [ ! -e "$SMM_STATE/aerospace.swap" ]
 }
+
+@test "nvim validation seeds isolated XDG dirs and cleans them after success or failure" {
+  load_lib
+  export XDG_STATE_HOME="$HOME/.local/state"
+  mkdir -p "$XDG_DATA_HOME/nvim/lazy" "$XDG_CACHE_HOME/nvim" "$XDG_STATE_HOME/nvim"
+  printf plugin > "$XDG_DATA_HOME/nvim/lazy/installed"
+  printf cache > "$XDG_CACHE_HOME/nvim/cached"
+  printf state > "$XDG_STATE_HOME/nvim/session"
+  stub nvim 0
+  sed -i '' '/^exit 0$/d' "$TMP/bin/nvim"
+  cat >> "$TMP/bin/nvim" <<'STUB'
+[ "$(cat "$XDG_DATA_HOME/nvim/lazy/installed")" = plugin ] || exit 91
+[ "$(cat "$XDG_CACHE_HOME/nvim/cached")" = cache ] || exit 92
+[ ! -e "$XDG_STATE_HOME/nvim/session" ] || exit 93
+printf '%s\n' "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME" "$XDG_STATE_HOME" > "$TMP/nvim-xdg"
+printf changed > "$XDG_DATA_HOME/nvim/lazy/installed"
+printf changed > "$XDG_CACHE_HOME/nvim/cached"
+mkdir -p "$XDG_STATE_HOME/nvim"
+printf changed > "$XDG_STATE_HOME/nvim/session"
+exit "${SMM_TEST_NVIM_STATUS:-0}"
+STUB
+  local expected path
+  for expected in 0 17; do
+    export SMM_TEST_NVIM_STATUS=$expected
+    run validate_nvim "$SMM_REPO/config/ghostty"
+    [ "$status" -eq "$expected" ]
+    [ "$(cat "$XDG_DATA_HOME/nvim/lazy/installed")" = plugin ]
+    [ "$(cat "$XDG_CACHE_HOME/nvim/cached")" = cache ]
+    [ "$(cat "$XDG_STATE_HOME/nvim/session")" = state ]
+    while IFS= read -r path; do
+      [ ! -e "$path" ]
+    done < "$TMP/nvim-xdg"
+  done
+}
+
+@test "nvim validation falls back to regular copies when APFS clones fail" {
+  load_lib
+  mkdir -p "$XDG_DATA_HOME/nvim" "$XDG_CACHE_HOME/nvim"
+  printf plugin > "$XDG_DATA_HOME/nvim/installed"
+  printf cache > "$XDG_CACHE_HOME/nvim/cached"
+  stub cp 0
+  sed -i '' '/^exit 0$/d' "$TMP/bin/cp"
+  cat >> "$TMP/bin/cp" <<'STUB'
+[ "$1" != -cR ] || exit 1
+exec /bin/cp "$@"
+STUB
+  stub nvim 0
+  sed -i '' '/^exit 0$/d' "$TMP/bin/nvim"
+  cat >> "$TMP/bin/nvim" <<'STUB'
+[ "$(cat "$XDG_DATA_HOME/nvim/installed")" = plugin ] || exit 91
+[ "$(cat "$XDG_CACHE_HOME/nvim/cached")" = cache ] || exit 92
+STUB
+  run validate_nvim "$SMM_REPO/config/ghostty"
+  [ "$status" -eq 0 ]
+  [ "$(calls | grep -c 'cp -cR')" -eq 2 ]
+  [ "$(calls | grep -c 'cp -R')" -eq 2 ]
+}

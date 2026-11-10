@@ -15,7 +15,17 @@ cmd_setup() (
   smm_setup_cleanup() {
     local recovered=0
     if [ "$complete" -eq 0 ]; then smm_setup_recover || recovered=1; fi
-    if [ -n "$logger" ]; then wait "$logger" || :; fi
+    if [ -n "$logger" ]; then
+      # A signal can land while this shell still writes into the FIFO, so tee
+      # would never see EOF. Let go of the FIFO, then wait briefly for tee.
+      if { : >/dev/tty; } 2>/dev/null; then exec >/dev/tty 2>&1; else exec >/dev/null 2>&1; fi
+      local tries=0
+      while kill -0 "$logger" 2>/dev/null && [ "$tries" -lt 20 ]; do
+        sleep 0.1; tries=$((tries + 1))
+      done
+      kill "$logger" 2>/dev/null || :
+      wait "$logger" 2>/dev/null || :
+    fi
     [ "$recovered" -ne 0 ] || rm -rf "$SMM_TX"
   }
   trap smm_setup_cleanup EXIT

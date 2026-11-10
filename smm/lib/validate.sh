@@ -108,13 +108,19 @@ validate_tmux() { tmux -L smm-validate -f /dev/null start-server \; source-file 
 validate_zsh() { zsh -n "$1"; }
 validate_plist() { plutil -lint "$1"; }
 validate_nvim() (
-  dir=$1 tmp='' status=0
+  dir=$1 tmp='' status=0 data='' cache=''
   dir=$(cd "$dir" && pwd) || exit 1
   tmp=$(mktemp -d) || exit 1
   trap 'rm -rf "$tmp"' EXIT
-  mkdir "$tmp/config"
+  mkdir "$tmp/config" "$tmp/data" "$tmp/cache" "$tmp/state"
   ln -s "$dir" "$tmp/config/nvim" || exit 1
-  XDG_CONFIG_HOME="$tmp/config" nvim --headless "+lua vim.defer_fn(function() if vim.v.errmsg ~= '' then vim.cmd('cq') else vim.cmd('qa') end end, 2000)" 2> "$tmp/stderr" || status=$?
+  # Run against clones of the plugin data and cache so lazy.nvim can't install
+  # or update anything in the real dirs. APFS clones are instant; copy otherwise.
+  data="${XDG_DATA_HOME:-$HOME/.local/share}/nvim"
+  cache="${XDG_CACHE_HOME:-$HOME/.cache}/nvim"
+  if [ -d "$data" ]; then cp -cR "$data" "$tmp/data/nvim" 2>/dev/null || cp -R "$data" "$tmp/data/nvim" || exit 1; fi
+  if [ -d "$cache" ]; then cp -cR "$cache" "$tmp/cache/nvim" 2>/dev/null || cp -R "$cache" "$tmp/cache/nvim" || exit 1; fi
+  XDG_CONFIG_HOME="$tmp/config" XDG_DATA_HOME="$tmp/data" XDG_CACHE_HOME="$tmp/cache" XDG_STATE_HOME="$tmp/state" nvim --headless "+lua vim.defer_fn(function() if vim.v.errmsg ~= '' then vim.cmd('cq') else vim.cmd('qa') end end, 2000)" 2> "$tmp/stderr" || status=$?
   cat "$tmp/stderr" >&2
   if grep -Eq 'E[0-9]+:|Error' "$tmp/stderr"; then status=1; fi
   exit "$status"

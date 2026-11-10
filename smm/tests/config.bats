@@ -20,9 +20,15 @@ PY
   run rg '^theme = Catppuccin Mocha$' "$REPO/config/ghostty/config"
   [ "$status" -eq 0 ]
 }
-@test "nvim disables Mason PATH changes and declares its Haskell server" {
+@test "nvim disables Mason PATH changes and keeps Haskell on the ghcup PATH" {
   rg '"williamboman/mason.nvim"' "$REPO/config/nvim/lua/plugins/init.lua"
   rg 'PATH = "skip"' "$REPO/config/nvim/lua/plugins/init.lua"
   rg 'ensure_installed = \{\}' "$REPO/config/nvim/lua/plugins/init.lua"
-  jq -e 'index("haskellPackages.static-ls") != null' "$REPO/manifest/nix-packages.json"
+  rg 'cmd = \{ "static-ls" \}' "$REPO/config/nvim/lua/configs/lspconfig.lua"
+  rg '"command": "static-ls"' "$REPO/config/nvim/coc-settings.json"
+  jq -e 'index("haskellPackages.static-ls") == null' "$REPO/manifest/nix-packages.json"
+}
+
+@test "shared zsh keeps the fuck alias with pay-respects" {
+  rg -Fx 'eval "$(pay-respects zsh --alias fuck)"' "$REPO/config/zsh/common.zsh"
 }

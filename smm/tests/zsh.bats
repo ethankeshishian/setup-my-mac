@@ -36,6 +36,9 @@ if host == 'Ethans-MacBook-Pro':
     expected['HISTSIZE=1000000'] = 1
     expected['setopt inc_append_history'] = 1
 expected['export _ZO_DOCTOR=0'] = 1
+# thefuck was removed from nixpkgs; pay-respects keeps the same alias
+del expected['eval $(thefuck --alias)']
+expected['eval "$(pay-respects zsh --alias fuck)"'] = 1
 actual = Counter(commands(before + common + after))
 assert actual == expected, f'missing: {expected-actual}\nextra: {actual-expected}'
 # Every shared command occurs only in common; structural fi/else may recur.

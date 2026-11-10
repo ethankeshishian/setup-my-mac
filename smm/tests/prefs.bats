@@ -20,12 +20,13 @@ app() { mkdir -p "$SMM_APPLICATIONS_DIR/$1.app/Contents"; echo plist > "$SMM_APP
   [ "$status" -eq 0 ]; [[ "$output" == *'ok alttab'* ]]
   calls | grep -Fq "$SMM_APPLICATIONS_DIR/AltTab.app/Contents/Info.plist"
 }
-@test "AltTab lookup ignores Nix Apps and prefers the Homebrew app" {
-  app 'Nix Apps/AltTab'
-  run smm_app_bundle alttab; [ "$status" -eq 1 ]
+@test "AltTab lookup prefers the pinned Nix app and falls back to Applications" {
   app AltTab
   run smm_app_bundle alttab
   [ "$status" -eq 0 ]; [ "$output" = "$SMM_APPLICATIONS_DIR/AltTab.app" ]
+  app 'Nix Apps/AltTab'
+  run smm_app_bundle alttab
+  [ "$status" -eq 0 ]; [ "$output" = "$SMM_APPLICATIONS_DIR/Nix Apps/AltTab.app" ]
 }
 @test "AltTab rejects older versions too" {
   app AltTab; stub plutil 0 6.29.0
@@ -112,20 +113,21 @@ if [ "$1" = -convert ]; then printf "%s\\n" "$stub_stdout" > "$4"; exit 0; fi\
   run smm_wait_permission alttab; [ "$status" -eq 0 ]
   run smm_permission_granted alttab; [ "$status" -ne 0 ]
 }
-@test "setup preserves the declared AltTab cask without deduping or replacing it" {
+@test "the Homebrew AltTab cask is a duplicate of the pinned Nix AltTab" {
   cp "$REPO/manifest/nix-packages.json" "$SMM_REPO/manifest/nix-packages.json"
   cp "$REPO/manifest/homebrew.json" "$SMM_REPO/manifest/homebrew.json"
-  cp "$SMM_REPO/manifest/homebrew.json" "$TMP/before"
+  ! jq -e '.casks | index("alt-tab")' "$SMM_REPO/manifest/homebrew.json"
   stub brew 0
   sed -i '' '/if \[ -n "$stub_stdout" \]/i\
 if [ "$*" = "list --cask" ]; then echo alt-tab; fi\
 ' "$TMP/bin/brew"
-  run smm_brew_duplicates; [ "$status" -eq 0 ]; [ -z "$output" ]
-  run step_brew_adopt_run; [ "$status" -eq 0 ]
+  run smm_brew_duplicates; [ "$status" -eq 0 ]; [[ "$output" == *'cask alt-tab'* ]]
   run step_dedupe_run; [ "$status" -eq 0 ]
+  calls | grep -q '^osascript .*AltTab$'
+  calls | grep -qx 'brew uninstall --cask alt-tab'
   run smm_setup_restore_brew; [ "$status" -eq 0 ]
-  cmp "$TMP/before" "$SMM_REPO/manifest/homebrew.json"
-  ! calls | grep -Eq '^brew (uninstall|install)|^osascript |^open '
+  calls | grep -qx 'brew install --cask alt-tab'
+  calls | grep -qx 'open -a AltTab'
 }
 @test "AltTab snapshot records 10.12.0 with all update checks disabled" {
   jq -e '.captured_version == "10.12.0" and .keys.updatePolicy == "0" and

@@ -69,7 +69,7 @@ setup() {
     .casks == (.casks | unique | sort) and .casks == ([
       "spotify", "arc", "todoist", "obsidian", "clay", "notion-calendar",
       "raindropio", "visual-studio-code", "mos", "mac-mouse-fix@2",
-      "betterdisplay", "alt-tab", "logi-options+", "raycast", "karabiner-elements",
+      "betterdisplay", "logi-options+", "raycast", "karabiner-elements",
       "font-martian-mono-nerd-font", "font-hack-nerd-font", "1password", "1password-cli",
       "hiddenbar", "vercel", "antigravity-cli", "codex", "claude-code@latest", "superhuman"
     ] | sort)' "$REPO/manifest/homebrew.json"
@@ -78,9 +78,9 @@ setup() {
 @test "nix manifest contains the approved attribute names" {
   jq -e '. == [
     "aerospace", "sketchybar", "jankyborders", "ghostty-bin", "neovim", "tmux",
-    "ripgrep", "fd", "fzf", "zoxide", "thefuck", "vivid", "git", "git-town", "gh",
+    "ripgrep", "fd", "fzf", "zoxide", "pay-respects", "vivid", "git", "git-town", "gh",
     "jq", "gitleaks", "python3", "lua-language-server", "typescript-language-server",
-    "vscode-langservers-extracted", "stylua", "haskellPackages.static-ls"
+    "vscode-langservers-extracted", "stylua"
   ]' "$REPO/manifest/nix-packages.json"
 }
 

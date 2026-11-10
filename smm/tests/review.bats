@@ -224,13 +224,36 @@ if [ "$1" = switch ] && [ "$2" = --flake ]; then kill -TERM "$PPID"; fi\
 }
 @test "review 1 setup TERM after activation restores originals and previous hash" {
   echo previous > "$SMM_STATE/applied.hash"
-  SETUP_STEPS=(configs switch permissions)
-  smm_use_build_tools() { :; }; smm_run_validate() { :; }
-  smm_switch() { ln -s "$SMM_REPO/config/test" "$HOME/.test"; }
-  step_permissions_done() { return 1; }
-  step_permissions_run() { bash -c 'kill -TERM "$PPID"'; }
-  run cmd_setup
+  local started=$SECONDS
+  run /bin/bash -c '
+    for file in "$REPO"/smm/lib/*.sh "$REPO"/smm/cmd/*.sh; do source "$file"; done
+    SETUP_STEPS=(configs switch permissions)
+    smm_use_build_tools() { :; }; smm_run_validate() { :; }
+    smm_switch() { ln -s "$SMM_REPO/config/test" "$HOME/.test"; }
+    step_permissions_done() { return 1; }
+    step_permissions_run() { bash -c "kill -TERM \$PPID"; }
+    cmd_setup
+  '
+  [ "$((SECONDS - started))" -lt 3 ]
   [ "$status" -eq 143 ]
+  [ "$(cat "$HOME/.test")" = original ]; [ ! -L "$HOME/.test" ]
+  [ "$(cat "$SMM_STATE/applied.hash")" = previous ]
+  calls | grep -q 'switch --switch-generation 42'
+}
+@test "review 1 setup INT after activation restores originals and previous hash" {
+  echo previous > "$SMM_STATE/applied.hash"
+  local started=$SECONDS
+  run /bin/bash -c '
+    for file in "$REPO"/smm/lib/*.sh "$REPO"/smm/cmd/*.sh; do source "$file"; done
+    SETUP_STEPS=(configs switch permissions)
+    smm_use_build_tools() { :; }; smm_run_validate() { :; }
+    smm_switch() { ln -s "$SMM_REPO/config/test" "$HOME/.test"; }
+    step_permissions_done() { return 1; }
+    step_permissions_run() { bash -c "kill -INT \$PPID"; }
+    cmd_setup
+  '
+  [ "$((SECONDS - started))" -lt 3 ]
+  [ "$status" -eq 130 ]
   [ "$(cat "$HOME/.test")" = original ]; [ ! -L "$HOME/.test" ]
   [ "$(cat "$SMM_STATE/applied.hash")" = previous ]
   calls | grep -q 'switch --switch-generation 42'

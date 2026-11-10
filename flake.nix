@@ -52,15 +52,20 @@
           && (builtins.readDir ./hosts).${file} == "regular")
           (builtins.attrNames (builtins.readDir ./hosts))));
 
-      packages.${system}.darwin-rebuild = nix-darwin.packages.${system}.darwin-rebuild;
-      apps.${system}.darwin-rebuild = {
-        type = "app";
-        program = "${nix-darwin.packages.${system}.darwin-rebuild}/bin/darwin-rebuild";
+      # ${system} is a dynamic name, so each attrset must be defined once.
+      packages.${system} = {
+        darwin-rebuild = nix-darwin.packages.${system}.darwin-rebuild;
+        smm = pkgs.callPackage ./smm/package.nix { };
       };
-      packages.${system}.smm = pkgs.callPackage ./smm/package.nix { };
-      apps.${system}.smm = {
-        type = "app";
-        program = "${pkgs.callPackage ./smm/package.nix { }}/bin/smm";
+      apps.${system} = {
+        darwin-rebuild = {
+          type = "app";
+          program = "${nix-darwin.packages.${system}.darwin-rebuild}/bin/darwin-rebuild";
+        };
+        smm = {
+          type = "app";
+          program = "${pkgs.callPackage ./smm/package.nix { }}/bin/smm";
+        };
       };
 
       devShells.${system}.default = pkgs.mkShell {

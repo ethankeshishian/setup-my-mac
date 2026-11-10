@@ -66,6 +66,8 @@ smm_brew_duplicates() {
       done <<< "$packages"
     done <<< "$installed"
   done
+  # AltTab comes from modules/darwin/alttab.nix rather than the package manifest.
+  if brew list --cask 2>/dev/null | grep -Fxq alt-tab; then printf 'cask alt-tab\n'; fi
 }
 
 smm_migrate_preview() (

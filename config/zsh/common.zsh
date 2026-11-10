@@ -57,7 +57,7 @@ alias vim=nvim
 alias switch='git town switch'
 alias sp='git town set-parent'
 alias c='clear'
-eval $(thefuck --alias)
+eval "$(pay-respects zsh --alias fuck)"
 alias ls="ls --color"
 
 # zsh behavior
