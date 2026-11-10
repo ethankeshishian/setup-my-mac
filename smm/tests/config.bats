@@ -16,8 +16,8 @@ assert config['start-at-login'] is False
 assert 'aerospace_workspace_change' in ' '.join(config['exec-on-workspace-change'])
 PY
 }
-@test "Ghostty uses the discovered bundled Catppuccin theme" {
-  run rg '^theme = catppuccin-mocha$' "$REPO/config/ghostty/config"
+@test "Ghostty uses the approved Catppuccin theme" {
+  run rg '^theme = Catppuccin Mocha$' "$REPO/config/ghostty/config"
   [ "$status" -eq 0 ]
 }
 @test "nvim disables Mason PATH changes and declares its Haskell server" {

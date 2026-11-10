@@ -121,9 +121,9 @@ eval_raw() {
 
 @test "link count equals manifest count" {
   eval_json home-manager.users.ethankeshishian.home.file --apply builtins.attrNames
-  [ "$(jq length <<< "$output")" -eq "$(jq length "$REPO/manifest/links.json")" ]
+  [ "$(jq length <<< "$output")" -eq "$(($(jq length "$REPO/manifest/links.json") + 1))" ]
   jq -r '.[].target' "$REPO/manifest/links.json" | LC_ALL=C sort > "$TMP/expected"
-  jq -r '.[]' <<< "$output" | LC_ALL=C sort > "$TMP/actual"
+  jq -r '.[] | select(. != ".config/tmux/plugins/catppuccin/tmux")' <<< "$output" | LC_ALL=C sort > "$TMP/actual"
   diff -u "$TMP/expected" "$TMP/actual"
 }
 
@@ -140,4 +140,18 @@ eval_raw() {
   [ "$status" -eq 0 ]; [[ "$output" == *darwin-rebuild* ]]
   run nix eval --raw --no-write-lock-file '.#apps.aarch64-darwin.darwin-rebuild.program'
   [ "$status" -eq 0 ]; [[ "$output" == */bin/darwin-rebuild ]]
+}
+
+@test "tmux Catppuccin comes from the pinned Nix package" {
+  eval_raw 'home-manager.users.ethankeshishian.home.file.".config/tmux/plugins/catppuccin/tmux".source'
+  [[ "$output" == /nix/store/*/share/tmux-plugins/catppuccin ]]
+}
+
+@test "zsh source uses each darwin local host identity" {
+  for host in Ethans-MacBook-Pro Ethans-MacBook-Pro-Mercury; do
+    FLAKE=".#darwinConfigurations.$host.config"
+    eval_raw 'home-manager.users.ethankeshishian.home.file.".zshrc".source' --apply 'source: source.buildCommand'
+    [[ "$output" == *"/config/zsh/$host.zshrc"* ]]
+    [[ "$output" != *'{host}'* ]]
+  done
 }

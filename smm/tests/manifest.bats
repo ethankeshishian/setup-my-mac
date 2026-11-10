@@ -6,13 +6,18 @@ setup() {
   setup_tmp
   REPO="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
   LINKS="$REPO/manifest/links.json"
+  export SMM_REPO="$REPO" SMM_HOST=Ethans-MacBook-Pro
+  source "$REPO/smm/lib/common.sh"
+  source "$REPO/smm/lib/build.sh"
 }
 
 @test "every link source exists" {
-  jq -er '.[].source' "$LINKS" > "$TMP/sources"
-  while IFS= read -r source; do
-    [ -e "$REPO/$source" ]
-  done < "$TMP/sources"
+  for SMM_HOST in Ethans-MacBook-Pro Ethans-MacBook-Pro-Mercury; do
+    links_resolved_json | jq -er '.[].source' > "$TMP/sources"
+    while IFS= read -r source; do
+      [ -e "$REPO/$source" ]
+    done < "$TMP/sources"
+  done
 }
 
 @test "link names unique" {
@@ -20,7 +25,7 @@ setup() {
 }
 
 @test "type matches source kind" {
-  jq -er '.[] | [.source, .type] | @tsv' "$LINKS" > "$TMP/kinds"
+  links_resolved_json | jq -er '.[] | [.source, .type] | @tsv' > "$TMP/kinds"
   while IFS=$'\t' read -r source kind; do
     case "$kind" in
       dir) [ -d "$REPO/$source" ] ;;
@@ -52,14 +57,16 @@ setup() {
   done < "$TMP/targets"
 }
 
-@test "homebrew manifest contains the approved seed packages" {
+@test "homebrew manifest contains the approved packages sorted without duplicates" {
   jq -e '
-    .taps == [] and .brews == ["tpm"] and .casks == [
+    .taps == [] and .brews == ["tpm"] and
+    .casks == (.casks | unique | sort) and .casks == ([
       "spotify", "arc", "todoist", "obsidian", "clay", "notion-calendar",
       "raindropio", "visual-studio-code", "mos", "mac-mouse-fix@2",
       "betterdisplay", "alt-tab", "logi-options+", "raycast", "karabiner-elements",
-      "font-martian-mono-nerd-font", "font-hack-nerd-font", "1password", "1password-cli"
-    ]' "$REPO/manifest/homebrew.json"
+      "font-martian-mono-nerd-font", "font-hack-nerd-font", "1password", "1password-cli",
+      "hiddenbar", "vercel", "antigravity-cli", "codex", "claude-code@latest", "superhuman"
+    ] | sort)' "$REPO/manifest/homebrew.json"
 }
 
 @test "nix manifest contains the approved attribute names" {

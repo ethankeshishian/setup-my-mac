@@ -1,4 +1,4 @@
-theme = catppuccin-mocha
+theme = Catppuccin Mocha
 
 font-size = 14
 font-family = "MartianMono NFM"
@@ -6,4 +6,5 @@ font-family = "MartianMono NFM"
 # keybindings
 keybind = cmd+s>r=reload_config
 keybind = cmd+s>x=close_surface
+keybind = cmd+s>n=prompt_surface_title
 keybind = shift+enter=text:\n

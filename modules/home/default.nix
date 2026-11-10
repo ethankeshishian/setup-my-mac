@@ -1,5 +1,5 @@
 {
-  imports = [ ./links.nix ];
+  imports = [ ./links.nix ./tmux.nix ];
 
   home = {
     username = "ethankeshishian";
