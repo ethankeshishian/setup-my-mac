@@ -6,7 +6,7 @@
     ./services.nix
   ];
 
-  # Determinate manages the daemon and its configuration.
+  # The host’s Nix installer manages the daemon and its configuration.
   nix.enable = false;
   nixpkgs.hostPlatform = "aarch64-darwin";
   system.primaryUser = "ethankeshishian";

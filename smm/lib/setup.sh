@@ -2,7 +2,7 @@
 
 smm_setup_steps() {
   # shellcheck disable=SC2034 # Consumed by cmd_setup in cmd/setup.sh.
-  SETUP_STEPS=(preflight nix lock host preview configs brew_adopt build dedupe switch permissions signin secrets nvim health commit finish)
+  SETUP_STEPS=(preflight host nix lock preview configs brew_adopt build dedupe switch permissions signin secrets nvim health commit finish)
 }
 
 smm_permission_granted() {
@@ -68,15 +68,20 @@ step_preflight_run() {
 }
 # Override only in isolated tests; production uses the installer's fixed paths.
 smm_nix_root() { printf '%s\n' "${SMM_NIX_ROOT:-/nix}"; }
-smm_nix_is_lix() { smm_nix --version 2>/dev/null | grep -qi lix; }
+smm_nix_version_matches() {
+  case "$1:$2" in
+    lix:*Lix*) return 0 ;;
+    determinate:*Lix*) return 1 ;;
+    determinate:*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 step_nix_done() {
-  local state
-  command -v nix >/dev/null 2>&1 && smm_nix --version >/dev/null 2>&1 || return 1
-  if smm_nix_is_lix; then
-    state=$(smm_state_dir) || return 1
-    [ -f "$state/nix-impl" ] && [ "$(cat "$state/nix-impl")" = lix ] || return 1
-  fi
-  smm_nix store ping --store daemon >/dev/null 2>&1
+  local impl version
+  command -v nix >/dev/null 2>&1 && version=$(smm_nix --version 2>/dev/null) || return 1
+  impl=$(smm_nix_impl) || return 1
+  smm_nix_version_matches "$impl" "$version" &&
+    smm_nix store ping --store daemon >/dev/null 2>&1
 }
 smm_install_determinate() (
   tmp=$(mktemp -d) || exit 1
@@ -84,51 +89,45 @@ smm_install_determinate() (
   curl -fsSL https://install.determinate.systems/nix -o "$tmp/installer" || exit 1
   sh "$tmp/installer" install
 )
+smm_install_lix() (
+  tmp=$(mktemp -d) || exit 1
+  trap 'rm -rf "$tmp"' EXIT
+  curl -sSf -L https://install.lix.systems/lix -o "$tmp/installer" || exit 1
+  sh "$tmp/installer" install
+)
 step_nix_run() {
-  local root state answer switched=0
+  local root impl version installed=0
   root=$(smm_nix_root) || return 1
-  state=$(smm_state_dir) || return 1
-  if smm_nix_is_lix; then
-    if [ -f "$state/nix-impl" ] && [ "$(cat "$state/nix-impl")" = lix ]; then
-      smm_nix store ping --store daemon || { warn 'Lix daemon is unavailable; repair Lix before rerunning setup'; return 1; }
-      return 0
+  impl=$(smm_nix_impl) || return 1
+  if command -v nix >/dev/null 2>&1; then
+    version=$(smm_nix --version 2>/dev/null) || {
+      warn 'Cannot identify the existing Nix implementation; repair it manually before rerunning setup. Setup never switches implementations or uninstalls Nix.'
+      return 1
+    }
+    if ! smm_nix_version_matches "$impl" "$version"; then
+      warn "Found $version, but host $(smm_host) requires $impl (manifest/hosts.json). Setup never switches implementations or uninstalls Nix."
+      return 1
     fi
-    log 'Lix detected. Current packages (nix profile list):'
-    smm_nix profile list || warn 'could not list the modern Nix profile'
-    log 'Legacy packages (nix-env -q; separate from nix profile list):'
-    nix-env -q || warn 'nix-env -q unavailable or no legacy profile'
-    answer=$(choose 'Choose Nix implementation' 'keep Lix' 'switch to Determinate Nix') || return 1
-    case "$answer" in
-      'keep Lix')
-        smm_nix store ping --store daemon || { warn 'Lix daemon is unavailable; repair Lix before rerunning setup'; return 1; }
-        printf 'lix\n' > "$state/nix-impl"
-        return "$?" ;;
-      'switch to Determinate Nix')
-        if [ ! -x "$root/lix-installer" ]; then
-          warn 'Lix uninstaller missing. Follow https://docs.lix.systems/manual/lix/stable/installation/uninstall.html then rerun setup; smm will not delete /nix.'
-          return 1
-        fi
-        "$root/lix-installer" uninstall || return 1
-        switched=1
-        # A Determinate receipt left by a former installation is not a repair path.
-        smm_install_determinate || return 1 ;;
-      *) return 1 ;;
-    esac
-  elif [ -x "$root/nix-installer" ]; then
-    "$root/nix-installer" repair || return 1
-  else
-    smm_install_determinate || return 1
+    smm_nix store ping --store daemon >/dev/null 2>&1 && return 0
+    installed=1
   fi
+  case "$impl" in
+    determinate)
+      if [ -x "$root/nix-installer" ]; then "$root/nix-installer" repair || return 1
+      else smm_install_determinate || return 1; fi ;;
+    lix)
+      if [ "$installed" -eq 0 ]; then smm_install_lix || return 1
+      elif [ -x "$root/lix-installer" ]; then "$root/lix-installer" repair || return 1
+      else
+        warn 'Lix is unhealthy and /nix/lix-installer is unavailable; repair Lix manually before rerunning setup.'
+        return 1
+      fi ;;
+  esac
   if ! command -v nix >/dev/null 2>&1 && [ -f "$root/var/nix/profiles/default/etc/profile.d/nix-daemon.sh" ]; then
     # shellcheck source=/dev/null
     source "$root/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
   fi
-  if [ "$switched" -eq 1 ] && smm_nix_is_lix; then
-    warn 'Lix is still on PATH; open a new shell and rerun setup'
-    return 1
-  fi
-  step_nix_done || return 1
-  printf 'determinate\n' > "$state/nix-impl"
+  step_nix_done
 }
 
 # The first Mac pins the flake inputs; every later Mac gets flake.lock from the repo.
@@ -149,7 +148,9 @@ step_host_done() {
   host=$(smm_host) || return 1
   [ -f "$(smm_repo)/config/zsh/$host.zshrc" ] &&
     [ -f "$(smm_repo)/hosts/$host.nix" ] && [ "$host" != template ] &&
-    git -C "$(smm_repo)" ls-files --error-unmatch "hosts/$host.nix" >/dev/null 2>&1
+    git -C "$(smm_repo)" ls-files --error-unmatch "hosts/$host.nix" >/dev/null 2>&1 &&
+    jq -e --arg host "$host" '.[$host].nix | . == "determinate" or . == "lix"' \
+      "$(smm_repo)/manifest/hosts.json" >/dev/null
 }
 smm_seed_host_zsh() {
   local host=$1 repo file
@@ -163,13 +164,23 @@ smm_seed_host_zsh() {
   else printf '# Host-specific zsh configuration for %s\n' "$host" > "$repo/$file"; fi
 }
 step_host_run() {
-  local current host repo
+  local current host repo impl tmp
   repo=$(smm_repo); current=$(smm_host) || return 1
   printf 'Host name [%s]: ' "$current" >&2
   IFS= read -r host </dev/tty || return 1
   host=${host:-$current}
   case "$host" in ''|*[!a-zA-Z0-9-]*|-*|template) warn 'invalid host name'; return 1 ;; esac
   [ "${#host}" -le 63 ] || return 1
+  impl=$(jq -r --arg host "$host" '.[$host].nix // empty' "$repo/manifest/hosts.json") || return 1
+  if [ -z "$impl" ]; then
+    impl=$(choose 'Choose Nix implementation' determinate lix) || return 1
+    case "$impl" in determinate|lix) ;; *) return 1 ;; esac
+    tmp=$(mktemp "$repo/manifest/.hosts.XXXXXX") || return 1
+    if ! jq --arg host "$host" --arg impl "$impl" '.[$host].nix = $impl' \
+      "$repo/manifest/hosts.json" > "$tmp"; then rm -f "$tmp"; return 1; fi
+    mv "$tmp" "$repo/manifest/hosts.json" || { rm -f "$tmp"; return 1; }
+  fi
+  case "$impl" in determinate|lix) ;; *) warn "invalid Nix implementation for $host: $impl"; return 1 ;; esac
   if [ ! -f "$repo/hosts/$host.nix" ]; then
     sed "s/HOSTNAME/$host/g" "$repo/hosts/template.nix" > "$repo/hosts/$host.nix" || return 1
   fi

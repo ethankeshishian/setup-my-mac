@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 
 smm_host() { if [ -n "${SMM_HOST:-}" ]; then printf '%s\n' "$SMM_HOST"; else scutil --get LocalHostName; fi; }
+# Hosts without a declaration retain the default until setup registers them.
+smm_nix_impl() {
+  local host impl
+  host=$(smm_host) || return 1
+  impl=$(jq -er --arg host "$host" '.[$host].nix // "determinate"' "$(smm_repo)/manifest/hosts.json") || return 1
+  case "$impl" in
+    determinate|lix) printf '%s\n' "$impl" ;;
+    *) warn "invalid Nix implementation for $host: $impl"; return 1 ;;
+  esac
+}
 smm_nix_inputs_hash() (
   set -o pipefail
   cd "$(smm_repo)" || exit 1

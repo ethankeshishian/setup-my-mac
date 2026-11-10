@@ -87,3 +87,8 @@ setup() {
   jq -e '.[] | select(.name == "nvim") | . == {name:"nvim",source:"config/nvim",target:".config/nvim",type:"dir",validator:"nvim",reload:null}' "$LINKS"
   jq -e '. == {upstream:"https://github.com/NvChad/starter",branch:"main",merged:"e3572e1f5e1c297212c3deeb17b7863139ce663e"}' "$REPO/manifest/nvchad-starter.json"
 }
+
+@test "hosts declare the fixed Nix implementations" {
+  jq -e '. == {"Ethans-MacBook-Pro":{"nix":"determinate"},
+    "Ethans-MacBook-Pro-Mercury":{"nix":"lix"}}' "$REPO/manifest/hosts.json"
+}

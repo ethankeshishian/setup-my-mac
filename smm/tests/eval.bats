@@ -27,9 +27,12 @@ eval_raw() {
   [ "$status" -eq 0 ]
 }
 
-@test "Determinate manages Nix" {
-  eval_json nix.enable
-  [ "$output" = false ]
+@test "host installers manage Nix on both Macs" {
+  for host in Ethans-MacBook-Pro Ethans-MacBook-Pro-Mercury; do
+    FLAKE=".#darwinConfigurations.$host.config"
+    eval_json nix.enable
+    [ "$output" = false ]
+  done
 }
 
 @test "Dock is on the right" {

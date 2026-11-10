@@ -12,10 +12,10 @@ its current `~/.zshrc` so local installers can continue appending to it.
 You never run `nix` yourself. `smm setup` installs Nix if it's missing (or
 repairs a broken install), and on the first Mac it pins the flake inputs and
 commits `flake.lock`. Every later Mac gets that lock from the repo, so all
-Macs use the same versions. Lix also works: setup lists modern and legacy profile
-packages and asks whether to keep Lix (remembered for reruns) or switch to
-Determinate Nix. Switching requires the Lix uninstaller; without it, setup stops
-with [Lix uninstall instructions](https://docs.lix.systems/manual/lix/stable/installation/uninstall.html).
+Macs use the same versions. Mercury uses Lix, the other Mac uses Determinate Nix;
+set per host in `manifest/hosts.json`; setup installs or repairs the right one
+and never switches. Setup asks which implementation to use when registering a
+new host.
 
 ## New Mac
 

@@ -6,6 +6,7 @@ setup() {
   export SMM_REPO="$HOME/Repos/setup-my-mac"
   make_repo "$SMM_REPO"
   mkdir -p "$SMM_REPO/manifest" "$SMM_REPO/hosts"
+  echo '{}' > "$SMM_REPO/manifest/hosts.json"
   echo '[]' > "$SMM_REPO/manifest/links.json"
   echo '[]' > "$SMM_REPO/manifest/secrets.json"
   echo '[]' > "$SMM_REPO/manifest/nix-packages.json"
@@ -100,7 +101,7 @@ fixture_steps() {
 @test "host step uses template and validates names" {
   stub scutil 0 New-Mac
   export SMM_TEST_TTY_INPUT=New-Mac
-  run run_tty /bin/bash -c 'for file in "$REPO"/smm/lib/*.sh; do source "$file"; done; step_host_run'; [ "$status" -eq 0 ]
+  run run_tty /bin/bash -c 'for file in "$REPO"/smm/lib/*.sh; do source "$file"; done; choose() { echo "$*" >> "$TMP/calls.log"; echo "${SMM_TEST_NIX_CHOICE:-determinate}"; }; step_host_run'; [ "$status" -eq 0 ]
   [ "$(rg -c '"New-Mac"' "$SMM_REPO/hosts/New-Mac.nix")" -eq 3 ]
   run step_host_done; [ "$status" -eq 0 ]
 }
@@ -150,6 +151,7 @@ if [ "$1" = uninstall ]; then grep -qx "brew sketchybar" "$SMM_STATE/deduped" ||
 @test "all default steps complete on an isolated degraded machine" {
   step_preflight_done() { return 0; }; step_nix_done() { return 0; }
   stub scutil 0 Test-Mac
+  echo '{"Test-Mac":{"nix":"determinate"}}' > "$SMM_REPO/manifest/hosts.json"
   cp "$SMM_REPO/hosts/template.nix" "$SMM_REPO/hosts/Test-Mac.nix"
   smm_seed_host_zsh Test-Mac
   mkdir -p "$SMM_REPO/config/nvim"; echo '{}' > "$SMM_REPO/config/nvim/lazy-lock.json"
@@ -194,7 +196,41 @@ esac\
 @test "new host is tracked before a Git flake build can discover it" {
   stub scutil 0 New-Mac
   export SMM_TEST_TTY_INPUT=New-Mac
-  run run_tty /bin/bash -c 'for file in "$REPO"/smm/lib/*.sh; do source "$file"; done; step_host_run'; [ "$status" -eq 0 ]
+  run run_tty /bin/bash -c 'for file in "$REPO"/smm/lib/*.sh; do source "$file"; done; choose() { echo "$*" >> "$TMP/calls.log"; echo "${SMM_TEST_NIX_CHOICE:-determinate}"; }; step_host_run'; [ "$status" -eq 0 ]
   git -C "$SMM_REPO" ls-files --error-unmatch hosts/New-Mac.nix
   [ "$(git -C "$SMM_REPO" show --format= --name-only HEAD)" = hosts/New-Mac.nix ]
+}
+
+@test "new host records its implementation before Nix setup" {
+  stub scutil 0 New-Mac
+  export SMM_TEST_TTY_INPUT=New-Mac SMM_TEST_NIX_CHOICE=lix
+  run run_tty /bin/bash -c 'for file in "$REPO"/smm/lib/*.sh; do source "$file"; done; choose() { echo "$*" >> "$TMP/calls.log"; echo "$SMM_TEST_NIX_CHOICE"; }; step_host_run'
+  [ "$status" -eq 0 ]
+  jq -e '. == {"New-Mac":{"nix":"lix"}}' "$SMM_REPO/manifest/hosts.json"
+  calls | grep -qx 'Choose Nix implementation determinate lix'
+  smm_setup_steps
+  [[ " ${SETUP_STEPS[*]} " == *' host nix '* ]]
+  run step_host_done; [ "$status" -eq 0 ]
+}
+@test "known host keeps its implementation without asking again" {
+  stub scutil 0 New-Mac
+  export SMM_TEST_TTY_INPUT=New-Mac
+  echo '{"New-Mac":{"nix":"lix","other":"preserved"}}' > "$SMM_REPO/manifest/hosts.json"
+  run run_tty /bin/bash -c 'for file in "$REPO"/smm/lib/*.sh; do source "$file"; done; choose() { exit 99; }; step_host_run'
+  [ "$status" -eq 0 ]
+  jq -e '. == {"New-Mac":{"nix":"lix","other":"preserved"}}' "$SMM_REPO/manifest/hosts.json"
+  echo '{}' > "$SMM_REPO/manifest/hosts.json"
+  run step_host_done; [ "$status" -ne 0 ]
+}
+
+@test "cancelled or invalid implementation choices do not register a host" {
+  stub scutil 0 New-Mac
+  export SMM_TEST_TTY_INPUT=New-Mac
+  for SMM_TEST_NIX_CHOICE in cancel invalid; do
+    export SMM_TEST_NIX_CHOICE
+    run run_tty /bin/bash -c 'for file in "$REPO"/smm/lib/*.sh; do source "$file"; done; choose() { [ "$SMM_TEST_NIX_CHOICE" != cancel ] || return 1; echo "$SMM_TEST_NIX_CHOICE"; }; step_host_run'
+    [ "$status" -ne 0 ]
+    jq -e '. == {}' "$SMM_REPO/manifest/hosts.json"
+    [ ! -f "$SMM_REPO/hosts/New-Mac.nix" ]
+  done
 }
