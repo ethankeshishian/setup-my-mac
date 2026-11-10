@@ -40,3 +40,42 @@ link_field() {
   links_json | jq -er --arg name "$1" --arg field "$2" '.[] | select(.name == $name) | .[$field] // empty'
 }
 link_names() { links_json | jq -r '.[].name'; }
+
+# Executable hooks let integration tests exercise real git without live apps.
+smm_run_validate() {
+  if [ -z "${SMM_VALIDATE_CMD:-}" ]; then smm_validate "$@"; return "$?"; fi
+  local output result=0
+  export SMM_FAILED_LINKS=''
+  output=$("$SMM_VALIDATE_CMD" "$@") || result=$?
+  [ -z "$output" ] || printf '%s\n' "$output"
+  SMM_FAILED_LINKS=$(awk '/^fail / {sub(/:$/, "", $2); printf "%s%s", sep, $2; sep=" "}' <<< "$output")
+  return "$result"
+}
+smm_run_apply() {
+  if [ -n "${SMM_APPLY_CMD:-}" ]; then "$SMM_APPLY_CMD" "$@"; else cmd_apply "$@"; fi
+}
+
+smm_safe_relative() {
+  case "/$1/" in *'/../'*|*'/./'*|*'//'*) return 1 ;; esac
+  case "$1" in ''|*$'\n'*|*$'\t'*) return 1 ;; esac
+}
+smm_backup_dir() {
+  local backup=${SMM_BACKUP:-$HOME/.smm-backup/$(date +%Y%m%d-%H%M%S)}
+  mkdir -p "$backup" || return 1
+  printf '%s\n' "$backup"
+}
+# Check existing ancestors as well as lexical traversal before changing sources.
+smm_config_source_safe() {
+  local source=$1 repo parent
+  smm_safe_relative "$source" || return 1
+  case "$source" in config/*) ;; *) return 1 ;; esac
+  repo=$(cd "$(smm_repo)" && pwd -P) || return 1
+  parent="$repo/$(dirname "$source")"
+  while [ ! -d "$parent" ]; do
+    [ ! -L "$parent" ] || return 1
+    parent=$(dirname "$parent")
+  done
+  parent=$(cd "$parent" && pwd -P) || return 1
+  case "$parent/" in "$repo/"*) ;; *) return 1 ;; esac
+  [ ! -L "$repo/$source" ]
+}

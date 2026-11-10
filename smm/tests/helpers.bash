@@ -14,7 +14,7 @@ setup_tmp() {
   export PATH="$TMP/bin:$PATH"
   : > "$TMP/calls.log"
   local tool
-  for tool in aerospace sketchybar brew darwin-rebuild sudo op gh launchctl osascript scutil systemextensionsctl karabiner_cli ghostty nvim open; do
+  for tool in aerospace sketchybar brew darwin-rebuild sudo op gh launchctl osascript scutil systemextensionsctl karabiner_cli ghostty nvim open defaults killall kitten curl; do
     stub "$tool" 127
   done
 }
