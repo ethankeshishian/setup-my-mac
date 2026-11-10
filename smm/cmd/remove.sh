@@ -3,7 +3,7 @@
 cmd_remove() (
   [ "$#" -eq 1 ] || { warn 'usage: smm remove <name>'; exit 2; }
   name=$1 repo=$(smm_repo)
-  source=$(link_field "$name" source) || { warn "unknown link: $name"; exit 1; }
+  source=$(link_source "$name") || { warn "unknown link: $name"; exit 1; }
   target=$(link_field "$name" target) || exit 1
   if ! smm_safe_relative "$target" || ! smm_config_source_safe "$source"; then warn 'unsafe manifest path'; exit 1; fi
   dest="$HOME/$target" manifest="$repo/manifest/links.json"
@@ -14,10 +14,11 @@ cmd_remove() (
   case "$parent/" in "$real_repo/"*) warn 'target is inside the repo'; exit 1 ;; esac
   smm_linked_to "$dest" "$repo/$source" || { warn 'target has drifted; reconcile it before removing'; exit 1; }
   # Refuse shared sources; removing one must never break a remaining link.
+  resolved=$(links_resolved_json) || exit 1
   jq -e --arg name "$name" --arg source "$source" '
     all(.[]; . as $entry | .name == $name or (.source != $source and
       (.source | startswith($source + "/") | not) and ($source | startswith($entry.source + "/") | not)))' \
-    "$manifest" >/dev/null || { warn 'source overlaps another link'; exit 1; }
+    <<< "$resolved" >/dev/null || { warn 'source overlaps another link'; exit 1; }
   answer=$(choose "Keep a normal copy at ~/$target?" 'keep file' delete) || exit 1
   case "$answer" in 'keep file'|delete) ;; *) exit 1 ;; esac
   backup=$(smm_backup_dir) || exit 1

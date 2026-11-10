@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 cmd_status() {
-  local repo changes counts ahead behind packages name source target secrets any=0
+  local repo changes counts ahead behind packages name source target secrets entries any=0
   repo=$(smm_repo)
   changes=$(git -C "$repo" status --short) || return 1
   if [ -n "$changes" ]; then printf 'uncommitted changes:\n%s\n' "$changes"; any=1; fi
@@ -19,13 +19,14 @@ cmd_status() {
   if packages=$(smm_brew_undeclared); then
     if [ -n "$packages" ]; then printf 'undeclared Homebrew packages:\n%s\n' "$packages"; any=1; fi
   else printf 'Homebrew status unavailable\n'; any=1; fi
+  entries=$(links_resolved_json) || return 1
   changes=''
   while IFS=$'\t' read -r name source target; do
     [ -n "$name" ] || continue
     if ! smm_linked_to "$HOME/$target" "$repo/$source"; then
       changes="${changes}${name}: ~/${target}"$'\n'
     fi
-  done < <(jq -r '.[] | [.name,.source,.target] | @tsv' "$repo/manifest/links.json")
+  done < <(jq -r '.[] | [.name,.source,.target] | @tsv' <<< "$entries")
   if [ -n "$changes" ]; then printf 'broken links:\n%s' "$changes"; any=1; fi
   secrets=$(jq -r '.[] | [.name,.target] | @tsv' "$repo/manifest/secrets.json") || return 1
   changes=''

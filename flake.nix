@@ -19,23 +19,29 @@
     let
       system = "aarch64-darwin";
       pkgs = import nixpkgs { inherit system; };
-      mkHost = host: nix-darwin.lib.darwinSystem {
-        inherit system;
-        modules = [
-          ./hosts/${host}.nix
-          ./modules/darwin
-          nix-homebrew.darwinModules.nix-homebrew
-          home-manager.darwinModules.home-manager
-          {
-            home-manager = {
-              useGlobalPkgs = true;
-              useUserPackages = true;
-              backupFileExtension = null;
-              users.ethankeshishian = import ./modules/home;
-            };
-          }
-        ];
-      };
+      mkHost = host:
+        let
+          hostIdentity = import ./hosts/${host}.nix;
+          hostName = hostIdentity.networking.localHostName;
+        in nix-darwin.lib.darwinSystem {
+          inherit system;
+          specialArgs = { inherit hostName; };
+          modules = [
+            hostIdentity
+            ./modules/darwin
+            nix-homebrew.darwinModules.nix-homebrew
+            home-manager.darwinModules.home-manager
+            {
+              home-manager = {
+                extraSpecialArgs = { inherit hostName; };
+                useGlobalPkgs = true;
+                useUserPackages = true;
+                backupFileExtension = null;
+                users.ethankeshishian = import ./modules/home;
+              };
+            }
+          ];
+        };
     in
     {
       darwinConfigurations = builtins.listToAttrs (map

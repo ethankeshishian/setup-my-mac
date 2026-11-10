@@ -5,13 +5,14 @@ smm_validate() {
   shift
   export SMM_FAILED_LINKS=''
   local entries
-  entries=$(jq -r '.[] | select(.validator != null) | [.name,.validator,.source] | @tsv' "$root/manifest/links.json") || return 1
-  while IFS=$'\t' read -r name validator source; do
+  entries=$(jq -r '.[] | select(.validator != null) | [.name,.validator] | @tsv' "$root/manifest/links.json") || return 1
+  while IFS=$'\t' read -r name validator; do
     [ -n "$name" ] || continue
     selected=0
     [ "$#" -eq 0 ] && selected=1
     for candidate in "$@"; do [ "$candidate" != "$name" ] || selected=1; done
     [ "$selected" -eq 1 ] || continue
+    source=$(link_source "$name" "$root") || return 1
     if declare -F "validate_$validator" >/dev/null; then
       if result=$("validate_$validator" "$root/$source" 2>&1); then
         if [[ "$result" == skipped* ]]; then printf '%s: %s\n' "$name" "$result";

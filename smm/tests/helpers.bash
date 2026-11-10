@@ -10,13 +10,14 @@ setup_tmp() {
   export XDG_CACHE_HOME="$HOME/.cache"
   export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_NOSYSTEM=1
   unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+  unset SMM_NIX_ROOT
   unset SMM_TX SMM_REPO SMM_BACKUP SMM_HOST SMM_YES SMM_SKIP_AEROSPACE
   unset SMM_APPLY_CMD SMM_VALIDATE_CMD SMM_SETUP_ORIGINAL_PATH
   mkdir -p "$HOME" "$SMM_STATE" "$TMP/bin"
   export PATH="$TMP/bin:$PATH"
   : > "$TMP/calls.log"
   local tool
-  for tool in nix aerospace sketchybar brew darwin-rebuild sudo op gh launchctl osascript scutil systemextensionsctl karabiner_cli ghostty nvim open defaults killall kitten curl; do
+  for tool in nix nix-env aerospace sketchybar brew darwin-rebuild sudo op gh launchctl osascript scutil systemextensionsctl karabiner_cli ghostty nvim open defaults killall kitten curl; do
     stub "$tool" 127
   done
   stub pgrep 0

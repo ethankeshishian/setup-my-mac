@@ -1,14 +1,24 @@
-# Vars
-export HOMEBREW_PREFIX="/opt/homebrew"
-export LS_COLORS="$(vivid generate catppuccin-mocha)"
-export EDITOR='nvim'
+export NVM_DIR="$HOME/.nvm"
+  [ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"  # This loads nvm
+  [ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
 
+export PATH="/Applications/Tailscale.app/Contents/MacOS:$PATH"
+
+export HOMEBREW_PREFIX="/opt/homebrew"
+export EDITOR=nvim
+export LS_COLORS="$(vivid generate catppuccin-mocha)"
+# Terminal
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
+# source /opt/homebrew/share/powerlevel10k/powerlevel10k.zsh-theme
+# [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+# source $HOMEBREW_PREFIX/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh
+# source $HOMEBREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+# source $HOMEBREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 # Set the directory we want to store zinit and plugins
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
@@ -60,14 +70,33 @@ alias c='clear'
 eval $(thefuck --alias)
 alias ls="ls --color"
 
+# Activate `fnm`: https://github.com/Schniz/fnm
+if command -v fnm >/dev/null; then
+    eval "$(fnm env --use-on-cd)"
+fi
+
+# Activate `direnv`: https://direnv.net/
+if command -v direnv >/dev/null; then
+    eval "$(direnv hook zsh)"
+fi
+
+# Source the Nix environment.
+if [[ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]]; then
+    . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+elif [[ -f /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]]; then
+    . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+fi
+
+[ -f "/Users/ethankeshishian/.ghcup/env" ] && . "/Users/ethankeshishian/.ghcup/env" # ghcup-env
+
 # zsh behavior
 bindkey -v "^?" backward-delete-char
 KEYTIMEOUT=1
 bindkey -M viins '\e\x7f' backward-kill-word
-# zsh history
+#zsh history
 bindkey '^[[A' history-search-backward
 bindkey '^[[B' history-search-forward
-HISTSIZE=5000
+HISTSIZE=1000000
 HISTFILE=~/.zsh_history
 SAVEHIST=$HISTSIZE
 HISTDUP=erase
@@ -78,6 +107,7 @@ setopt hist_ignore_all_dups
 setopt hist_save_no_dups
 setopt hist_ignore_dups
 setopt hist_find_no_dups
+setopt inc_append_history
 # zsh completion styling
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
 zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
@@ -88,3 +118,19 @@ zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
 # Shell integrations
 eval "$(fzf --zsh)"
 eval "$(zoxide init --cmd cd zsh)"
+
+
+# bindkey              '^I' menu-select
+# bindkey "$terminfo[kcbt]" menu-select
+#
+# # all Tab widgets
+# zstyle ':autocomplete:*complete*:*' insert-unambiguous yes
+#
+# # all history widgets
+# zstyle ':autocomplete:*history*:*' insert-unambiguous yes
+#
+# # ^S
+# zstyle ':autocomplete:menu-search:*' insert-unambiguous yes
+
+# Created by `pipx` on 2026-06-05 20:18:27
+export PATH="$PATH:/Users/ethankeshishian/.local/bin"

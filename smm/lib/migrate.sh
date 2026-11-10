@@ -20,7 +20,7 @@ smm_migrate_file_status() {
 
 smm_migrate_status() (
   name=$1 repo=$(smm_repo)
-  source=$(link_field "$name" source) && target=$(link_field "$name" target) || exit 1
+  source=$(link_source "$name") && target=$(link_field "$name" target) || exit 1
   smm_safe_relative "$target" && smm_config_source_safe "$source" || exit 1
   live="$HOME/$target"
   if [ -L "$live" ] && [ "$live" -ef "$repo/$source" ]; then echo linked; exit 0; fi
@@ -89,7 +89,7 @@ smm_migrate_resolve() (
   name=$1 repo=$(smm_repo)
   status=$(smm_migrate_status "$name") || exit 1
   case "$status" in linked|missing|same) exit 0 ;; esac
-  source=$(link_field "$name" source) && target=$(link_field "$name" target) || exit 1
+  source=$(link_source "$name") && target=$(link_field "$name" target) || exit 1
   live="$HOME/$target"
   # An unmanaged symlink needs explicit inspection; do not import external links.
   [ ! -L "$live" ] || { warn "inspect unmanaged symlink: $live"; exit 1; }

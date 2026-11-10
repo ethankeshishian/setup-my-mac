@@ -11,11 +11,12 @@ smm_scan_outgoing() (
   gitleaks git "--log-opts=$range" --no-banner --redact || status=1
   jq -r '.[].target' manifest/secrets.json > "$tmp/targets" || exit 1
   if [ -f manifest/links.json ]; then
+    resolved=$(links_resolved_json) || exit 1
     jq -r --slurpfile secrets manifest/secrets.json '
       .[] | . as $link | $secrets[0][] | .target as $target |
       select($target == $link.target or
         ($link.type == "dir" and ($target | startswith($link.target + "/")))) |
-      $link.source + ($target | ltrimstr($link.target))' manifest/links.json >> "$tmp/targets" || exit 1
+      $link.source + ($target | ltrimstr($link.target))' <<< "$resolved" >> "$tmp/targets" || exit 1
   fi
   while IFS= read -r commit; do
     git diff-tree --root -m --no-commit-id --name-only -r -z "$commit" -- > "$tmp/paths" || exit 1

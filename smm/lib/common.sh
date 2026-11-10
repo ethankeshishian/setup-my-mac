@@ -41,6 +41,42 @@ link_field() {
 }
 link_names() { links_json | jq -r '.[].name'; }
 
+# Resolve against the manifest being inspected (including sync worktrees).
+link_source() {
+  local name=$1 root=${2:-$(smm_repo)} source host
+  source=$(jq -er --arg name "$name" '.[] | select(.name == $name) | .source' "$root/manifest/links.json") || return 1
+  case "$source" in *'{host}'*)
+    host=$(smm_host) || return 1
+    case "$host" in ''|-*|*[!a-zA-Z0-9-]*) warn 'invalid host name'; return 1 ;; esac
+    source=${source//\{host\}/$host}
+    ;;
+  esac
+  smm_safe_relative "$source" || return 1
+  printf '%s\n' "$source"
+}
+
+links_resolved_json() {
+  local root=${1:-$(smm_repo)} entries names name source
+  entries=$(cat "$root/manifest/links.json") || return 1
+  names=$(jq -r '.[].name' <<< "$entries") || return 1
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    source=$(link_source "$name" "$root") || return 1
+    entries=$(jq --arg name "$name" --arg source "$source" 'map(if .name == $name then .source = $source else . end)' <<< "$entries") || return 1
+  done <<< "$names"
+  printf '%s\n' "$entries"
+}
+
+# Lix and upstream Nix both need these features; sudo must wrap the same argv.
+smm_nix() {
+  if [ "${1:-}" = --sudo ]; then
+    shift
+    sudo nix --extra-experimental-features 'nix-command flakes' "$@"
+  else
+    nix --extra-experimental-features 'nix-command flakes' "$@"
+  fi
+}
+
 # Executable hooks let integration tests exercise real git without live apps.
 smm_run_validate() {
   if [ -z "${SMM_VALIDATE_CMD:-}" ]; then smm_validate "$@"; return "$?"; fi

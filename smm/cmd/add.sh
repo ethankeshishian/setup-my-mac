@@ -23,10 +23,11 @@ cmd_add() (
   smm_config_source_safe "$source" || { warn 'unsafe source path'; exit 1; }
   dest="$repo/$source" manifest="$repo/manifest/links.json"
   [ ! -e "$dest" ] && [ ! -L "$dest" ] || { warn 'repo source already exists'; exit 1; }
+  resolved=$(links_resolved_json) || exit 1
   if ! jq -e --arg name "$name" --arg target "$target" --arg source "$source" '
     all(.[]; . as $entry | .name != $name and
       (.target != $target and (.target | startswith($target + "/") | not) and ($target | startswith($entry.target + "/") | not)) and
-      (.source != $source and (.source | startswith($source + "/") | not) and ($source | startswith($entry.source + "/") | not)))' "$manifest" >/dev/null; then
+      (.source != $source and (.source | startswith($source + "/") | not) and ($source | startswith($entry.source + "/") | not)))' <<< "$resolved" >/dev/null; then
     warn 'link name or path overlaps an existing entry'; exit 1
   fi
   kind='file'
