@@ -18,10 +18,10 @@ for smm_file in "$smm_root"/lib/*.sh "$smm_root"/cmd/*.sh; do
   source "$smm_file"
 done
 
-if [ "${1:-}" = -y ]; then
+while [ "${1:-}" = -y ]; do
   export SMM_YES=1
   shift
-fi
+done
 case "${1:---help}" in
   --help|-h)
     printf '%s\n' 'Usage: smm [-y] <command> [args]' \

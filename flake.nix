@@ -40,6 +40,12 @@
     {
       darwinConfigurations.Ethans-MacBook-Pro = mkHost "Ethans-MacBook-Pro";
 
+      packages.${system}.smm = pkgs.callPackage ./smm/package.nix { };
+      apps.${system}.smm = {
+        type = "app";
+        program = "${pkgs.callPackage ./smm/package.nix { }}/bin/smm";
+      };
+
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [ bats shellcheck jq gitleaks git ];
       };
