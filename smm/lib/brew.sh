@@ -49,6 +49,9 @@ smm_brew_interactive() { [ "${SMM_YES:-0}" != 1 ] && [ -t 0 ]; }
 smm_brew_resolve() {
   local packages kind name answer
   packages=$(smm_brew_undeclared) || return 1
+  if [ -n "${SMM_BREW_EXCLUDE:-}" ]; then
+    packages=$(printf '%s\n' "$packages" | grep -Fvx -f <(printf '%s\n' "$SMM_BREW_EXCLUDE")) || packages=''
+  fi
   [ -n "$packages" ] || return 0
   if [ "${1:-}" = --list-only ]; then printf '%s\n' "$packages"; return 0; fi
   if ! smm_brew_interactive; then warn "undeclared Homebrew packages (unchanged):

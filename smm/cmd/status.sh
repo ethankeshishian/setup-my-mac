@@ -34,6 +34,9 @@ cmd_status() {
     [ -f "$HOME/$target" ] || changes="${changes}missing secret: $name"$'\n'
   done <<< "$secrets"
   if ! gh auth status >/dev/null 2>&1; then changes="${changes}GitHub not signed in (push disabled)"$'\n'; fi
+  if [ -f "$(smm_state_dir)/signin-skipped" ] && ! op whoami >/dev/null 2>&1; then
+    changes="${changes}1Password not signed in (weather disabled)"$'\n'
+  fi
   if [ -n "$changes" ]; then printf 'degraded items:\n%s' "$changes"; any=1; fi
   [ "$any" -ne 0 ] || printf 'clean\n'
   return 0

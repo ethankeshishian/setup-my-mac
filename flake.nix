@@ -38,7 +38,13 @@
       };
     in
     {
-      darwinConfigurations.Ethans-MacBook-Pro = mkHost "Ethans-MacBook-Pro";
+      darwinConfigurations = builtins.listToAttrs (map
+        (file: let host = nixpkgs.lib.removeSuffix ".nix" file;
+          in { name = host; value = mkHost host; })
+        (builtins.filter (file: file != "template.nix"
+          && nixpkgs.lib.hasSuffix ".nix" file
+          && (builtins.readDir ./hosts).${file} == "regular")
+          (builtins.attrNames (builtins.readDir ./hosts))));
 
       packages.${system}.smm = pkgs.callPackage ./smm/package.nix { };
       apps.${system}.smm = {
