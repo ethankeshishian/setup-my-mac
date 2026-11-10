@@ -73,14 +73,17 @@ validate_aerospace() (
 )
 validate_ghostty() { ghostty +validate-config "--config-file=$1/config"; }
 validate_karabiner() (
-  dir=$1 tmp='' profile='' status=0
+  dir=$1 tmp='' profile='' status=0 cli=''
   jq empty "$dir/karabiner.json" || exit 1
+  # karabiner_cli ships inside the app's support folder, not on PATH
+  cli=$(command -v karabiner_cli) ||
+    cli="/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
   tmp=$(mktemp -d) || exit 1
   trap 'rm -rf "$tmp"' EXIT
   jq -c '.profiles[] | {title:"smm", rules:(.complex_modifications.rules // [])}' "$dir/karabiner.json" > "$tmp/profiles" || exit 1
   while IFS= read -r profile; do
     printf '%s\n' "$profile" > "$tmp/rules.json"
-    karabiner_cli --lint-complex-modifications "$tmp/rules.json" || { status=$?; break; }
+    "$cli" --lint-complex-modifications "$tmp/rules.json" || { status=$?; break; }
   done < "$tmp/profiles"
   exit "$status"
 )
