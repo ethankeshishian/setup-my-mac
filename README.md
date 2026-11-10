@@ -1,18 +1,85 @@
 # setup-my-mac
 
-This script is meant to setup my Mac. The goal is to provide a setup for homebrew, zsh, Neovim, kitty, productivity software, and applications.
+My Apple Silicon Macs, managed with nix-darwin, home-manager, and `smm`.
+The repository lives at `~/Repos/setup-my-mac`. Configs link directly into
+`config/`, so editing a linked file edits the repo. JSON manifests declare
+links, Nix packages, Homebrew packages, and 1Password secret references.
 
-## Currently experimenting
-Zsh config. You will be able to remove certain installs from the shell installation. I added vivid and fzf, which you will need.
+## New Mac
 
-## Before install:
-- Follow the instructions [here](https://docs.github.com/en/get-started/git-basics/caching-your-github-credentials-in-git) to set up your personal access token. This will let you use Git and clone your nvim config.
+On an arm64 Mac running macOS 27:
 
-## After install:
+```bash
+curl -fsSL https://raw.githubusercontent.com/ethankeshishian/setup-my-mac/main/bootstrap.sh | bash
+```
 
-- Run `:MasonInstallAll` in nvim.
-- You might need to run treesitter commands manually: `:TSInstall typescript`,`:TSInstall javascript`, `:TSInstall tsx`
-- Run `<leader>I` in tmux. Reload with `<leader>r`.
-- At least one of the system config commands will require a logout, if not a full restart.
-- Manually disable Control arrow shortcuts in Mac Keyboard Shortcut settings. This makes jumping to panes and windows work for tmux/nvim.
-- Manually create Alt-Tab and Raycast shortcuts (configs don't exist).
+Bootstrap installs Nix with the Determinate installer if needed, loads its
+profile, clones this repo at the fixed path, and runs `smm setup` through Nix.
+Run `bash bootstrap.sh --dry-run` to preview its five steps. Rerunning bootstrap
+reuses the installation and checkout.
+
+Setup is resumable: fix a failed step and rerun `smm setup`. It backs up local
+configs under `~/.smm-backup/<timestamp>/`, compares them with the repo, and lets
+you keep either version or pick changes. Sign in to 1Password with CLI integration
+and GitHub through `gh auth login` when prompted. Skipping sign-in leaves a
+reported degraded state: weather is off or pushing is disabled. Permissions need
+your clicks; setup opens the settings panes. Any restart is offered once at the end.
+
+## Existing Mac
+
+After the first Nix build puts `smm` on PATH:
+
+```bash
+cd ~/Repos/setup-my-mac
+smm setup --preview
+smm setup
+```
+
+Before that first build, use `nix run .#smm -- setup --preview`, then
+`nix run .#smm -- setup`. Migrate `Ethans-MacBook-Pro` first. On the second Mac,
+review each differing config, including nvim and its plugin lockfile, so local
+tweaks are preserved. Undeclared Homebrew packages are offered for adoption or
+explicit removal. The old `setup-my-mac.sh` is retired.
+
+## Commands
+
+| Command | When to use it | Behavior |
+| --- | --- | --- |
+| `smm setup` | Fresh Mac or migration | Compare, back up, build, link configs, guide permissions and sign-ins; safe to rerun. `--preview` shows differences first. |
+| `smm apply` | After editing configs | Validate, rebuild changed Nix inputs, activate and check health, then reload valid apps. Failed configs remain untouched and are reported. Versions stay pinned. |
+| `smm sync` | Moving between Macs | Validate local edits, prompt for a commit message (or use `-m "message"`), validate incoming changes in a temporary worktree, scan outgoing history, push, and apply. Conflicts require a choice. Offline runs stop before a local commit. |
+| `smm add <path>` | Keep a local config | Copy into `config/`, declare and link it, then apply. Use `--name <name>` to override the default name. Leaves changes uncommitted. |
+| `smm remove <name>` | Stop managing a config | Ask whether to keep a normal local copy or delete it, remove its declaration and repo source, then apply. Keeps a backup. |
+| `smm status` | Inspect changes and drift | Show uncommitted edits, ahead/behind commits, undeclared Homebrew packages, broken links and degraded sign-ins or secrets. |
+| `smm upgrade` | Deliberate version updates | Update Nix and nvim locks, validate and health-check, then commit the upgrade. Homebrew cask updates require confirmation. Starter template changes are review-only. |
+| `smm undo` | Undo an upgrade | Revert the latest unreverted upgrade commit, apply it, and restore pinned nvim plugins. Requires a clean tree. |
+| `smm validate [names...]` | Check configs | Run each declared validator, or a named subset. |
+
+`-y` accepts ordinary confirmations. It does **not** silently adopt or uninstall
+undeclared Homebrew packages; noninteractive runs warn and leave them alone.
+Secrets come from 1Password into ignored or out-of-repo files with mode 600,
+are cached between applies, and never belong in a commit. Outgoing history is
+scanned before pushing. Setup state lives under `~/.local/state/smm/`.
+
+## Limits
+
+Homebrew casks are not pinned and cannot be rolled back. Self-updating apps can
+change independently of `smm`. macOS permissions require manual approval.
+Nix-managed state rolls back after activation or health failures; your own edits
+to linked configs are preserved. Apps that reload on save may see those edits
+before validation.
+
+## Remaining manual steps
+
+Sign in to the App Store and iCloud. Complete any skipped application sign-ins,
+and configure shortcuts inside apps such as Raycast and Alt-Tab. After nvim's
+history has been migrated and verified, archive `nvchad-starter` on GitHub yourself.
+
+## Development
+
+Run `bats smm/tests` and
+`shellcheck -x smm/bin/smm smm/lib/*.sh smm/cmd/*.sh bootstrap.sh setup-my-mac.sh`.
+Tests isolate HOME and stub system tools; Nix evaluation tests skip when Nix is
+unavailable. The CLI also runs directly as `smm/bin/smm`. Nix builds, stable-package
+validation and the attended migration must be verified on a Nix-equipped Mac
+before using setup on the live machine.
