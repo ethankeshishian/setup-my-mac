@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-smm_host() { scutil --get LocalHostName; }
+smm_host() { if [ -n "${SMM_HOST:-}" ]; then printf '%s\n' "$SMM_HOST"; else scutil --get LocalHostName; fi; }
 smm_nix_inputs_hash() (
   set -o pipefail
   cd "$(smm_repo)" || exit 1
@@ -49,4 +49,14 @@ smm_rollback() {
   state=$(smm_state_dir) || return 1
   sudo darwin-rebuild switch --switch-generation "$1" || return "$?"
   rm -f "$state/applied.hash"
+}
+
+# Validators must use the candidate application's version before activation.
+smm_use_build_tools() {
+  local state result
+  state=$(smm_state_dir) || return 1
+  [ -f "$state/last-build" ] || return 0
+  result=$(cat "$state/last-build") || return 1
+  [ -d "$result/sw/bin" ] || { warn 'candidate build has no sw/bin'; return 1; }
+  export PATH="$result/sw/bin:$PATH"
 }
