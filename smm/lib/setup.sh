@@ -2,7 +2,7 @@
 
 smm_setup_steps() {
   # shellcheck disable=SC2034 # Consumed by cmd_setup in cmd/setup.sh.
-  SETUP_STEPS=(preflight nix host preview configs brew_adopt build dedupe switch permissions signin secrets nvim health commit finish)
+  SETUP_STEPS=(preflight nix lock host preview configs brew_adopt build dedupe switch permissions signin secrets nvim health commit finish)
 }
 
 smm_permission_granted() {
@@ -85,6 +85,19 @@ step_nix_run() {
     source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
   fi
   step_nix_done
+}
+
+# The first Mac pins the flake inputs; every later Mac gets flake.lock from the repo.
+step_lock_done() {
+  git -C "$(smm_repo)" ls-files --error-unmatch flake.lock >/dev/null 2>&1
+}
+step_lock_run() {
+  local repo
+  repo=$(smm_repo)
+  (cd "$repo" && nix flake lock) || return 1
+  git -C "$repo" add flake.lock &&
+    git -C "$repo" commit -q -m 'Pin Nix inputs' -- flake.lock || return 1
+  step_lock_done
 }
 
 step_host_done() {

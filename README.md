@@ -5,19 +5,12 @@ The repository lives at `~/Repos/setup-my-mac`. Configs link directly into
 `config/`, so editing a linked file edits the repo. JSON manifests declare
 links, Nix packages, Homebrew packages, and 1Password secret references.
 
-## First Mac: pin inputs before migration
+## Nix is handled for you
 
-The first step on the first Mac, once Nix is available, is `nix flake lock`
-and committing the resulting `flake.lock` before running setup or bootstrap:
-
-```bash
-cd ~/Repos/setup-my-mac
-nix flake lock
-git add flake.lock
-git commit -m "Pin Nix inputs before migration"
-```
-
-Share that commit with every Mac so they use the same pinned versions.
+You never run `nix` yourself. `smm setup` installs Nix if it's missing (or
+repairs a broken install), and on the first Mac it pins the flake inputs and
+commits `flake.lock`. Every later Mac gets that lock from the repo, so all
+Macs use the same versions.
 
 ## New Mac
 

@@ -109,6 +109,24 @@ fixture_steps() {
   run step_nix_done; [ "$status" -ne 0 ]
   calls | grep -qx 'nix --version'
 }
+@test "lock step pins and commits flake inputs when flake.lock is missing" {
+  stub nix 0
+  sed -i '' '/exit 0/i\
+if [ "$1 $2" = "flake lock" ]; then echo "{}" > flake.lock; fi\
+' "$TMP/bin/nix"
+  run step_lock_done; [ "$status" -ne 0 ]
+  run step_lock_run; [ "$status" -eq 0 ]
+  calls | grep -qx 'nix flake lock'
+  [ "$(git -C "$SMM_REPO" log -1 --format=%s)" = 'Pin Nix inputs' ]
+  run step_lock_done; [ "$status" -eq 0 ]
+}
+@test "lock step is done when flake.lock is already tracked" {
+  echo '{}' > "$SMM_REPO/flake.lock"
+  git -C "$SMM_REPO" add flake.lock; git -C "$SMM_REPO" commit -qm lock
+  stub nix 0
+  run step_lock_done; [ "$status" -eq 0 ]
+  ! calls | grep -q 'nix flake lock'
+}
 @test "dedupe journals before uninstall and removes duplicates from declarations" {
   echo '["sketchybar"]' > "$SMM_REPO/manifest/nix-packages.json"
   echo '{"taps":[],"brews":["sketchybar"],"casks":[]}' > "$SMM_REPO/manifest/homebrew.json"
@@ -134,6 +152,7 @@ if [ "$1" = uninstall ]; then grep -qx "brew sketchybar" "$SMM_STATE/deduped" ||
   stub scutil 0 Test-Mac
   cp "$SMM_REPO/hosts/template.nix" "$SMM_REPO/hosts/Test-Mac.nix"
   mkdir -p "$SMM_REPO/config/nvim"; echo '{}' > "$SMM_REPO/config/nvim/lazy-lock.json"
+  echo '{}' > "$SMM_REPO/flake.lock"
   git -C "$SMM_REPO" add -A; git -C "$SMM_REPO" commit -qm fixture
   stub op 1; stub gh 1; stub pgrep 0; stub sketchybar 0 '{"items":[]}'
   confirm() { return 0; }
