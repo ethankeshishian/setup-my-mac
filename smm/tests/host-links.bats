@@ -75,8 +75,10 @@ setup() {
   [ "$(cat "$SMM_REPO/config/zsh/Test-Mac.zshrc")" = 'echo repo' ]
   echo live > "$HOME/.zshrc"
   smm_seed_host_zsh New-Mac
-  [ "$(cat "$SMM_REPO/config/zsh/New-Mac.zshrc")" = live ]
+  [ "$(tail -n 1 "$SMM_REPO/config/zsh/New-Mac.zshrc")" = live ]
+  rg -Fx '[ -f ~/.config/zsh/common.zsh ] && source ~/.config/zsh/common.zsh' "$SMM_REPO/config/zsh/New-Mac.zshrc"
   rm "$HOME/.zshrc"
   smm_seed_host_zsh Fresh-Mac
   rg '^#' "$SMM_REPO/config/zsh/Fresh-Mac.zshrc"
+  rg -Fx '[ -f ~/.config/zsh/common.zsh ] && source ~/.config/zsh/common.zsh' "$SMM_REPO/config/zsh/Fresh-Mac.zshrc"
 }

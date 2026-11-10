@@ -160,15 +160,51 @@ step_host_done() {
       "$(smm_repo)/manifest/hosts.json" >/dev/null
 }
 smm_seed_host_zsh() {
-  local host=$1 repo file
+  local host=$1 repo file common local_zsh
   case "$host" in ''|-*|*[!a-zA-Z0-9-]*) warn 'invalid host name'; return 1 ;; esac
   repo=$(smm_repo) || return 1
   file="config/zsh/$host.zshrc"
   smm_config_source_safe "$file" || return 1
   [ ! -e "$repo/$file" ] || return 0
   mkdir -p "$repo/config/zsh" || return 1
-  if [ -f "$HOME/.zshrc" ]; then cp "$HOME/.zshrc" "$repo/$file";
-  else printf '# Host-specific zsh configuration for %s\n' "$host" > "$repo/$file"; fi
+  common="$repo/config/zsh/common.zsh"
+  [ -f "$common" ] || common=/dev/null
+  local_zsh="$HOME/.zshrc"
+  [ -f "$local_zsh" ] || local_zsh=/dev/null
+  {
+    printf '%s\n' "# This Mac's own zsh setup. Shared settings live in ~/.config/zsh/common.zsh; anything below overrides them. Installers may append here." \
+      '[ -f ~/.config/zsh/common.zsh ] && source ~/.config/zsh/common.zsh'
+    # Match whole shared if-blocks, never individual fi/else lines. Keep an
+    # unmatched local block intact, including shared-looking commands inside it.
+    awk -v source_line='[ -f ~/.config/zsh/common.zsh ] && source ~/.config/zsh/common.zsh' '
+      function normalize(line) {
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+        gsub(/[[:space:]]+/, " ", line)
+        if (line == "export EDITOR=\047nvim\047" || line == "export EDITOR=\"nvim\"")
+          line = "export EDITOR=nvim"
+        return line
+      }
+      function flush() {
+        if (reading_common) { if (key != "") shared[key] = 1 }
+        else if (!(key in shared) && key != source_line) printf "%s", block
+        block = ""; key = ""
+      }
+      FNR == 1 {
+        flush()
+        reading_common = (FILENAME == ARGV[1])
+      }
+      {
+        line = normalize($0)
+        block = block $0 "\n"
+        if (line == "" || line ~ /^#/) next
+        key = key (key == "" ? "" : "\034") line
+        if (line ~ /^if / && line !~ /;[[:space:]]*fi([[:space:]]|;|$)/) depth++
+        if (line ~ /^fi([[:space:]]|;|$)/) depth--
+        if (depth == 0) flush()
+      }
+      END { flush() }
+    ' "$common" "$local_zsh"
+  } > "$repo/$file"
 }
 step_host_run() {
   local current host repo impl tmp

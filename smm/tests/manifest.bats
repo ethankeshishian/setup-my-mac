@@ -24,6 +24,12 @@ setup() {
   jq -e 'map(.name) | length == (unique | length)' "$LINKS"
 }
 
+@test "shared zsh configuration is linked and validated separately" {
+  jq -e '[.[] | select(.name == "zsh-common")] == [{name:"zsh-common",
+    source:"config/zsh/common.zsh",target:".config/zsh/common.zsh",
+    type:"file",validator:"zsh",reload:null}]' "$LINKS"
+}
+
 @test "type matches source kind" {
   links_resolved_json | jq -er '.[] | [.source, .type] | @tsv' > "$TMP/kinds"
   while IFS=$'\t' read -r source kind; do

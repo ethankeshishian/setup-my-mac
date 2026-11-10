@@ -69,7 +69,7 @@ under `~/.local/state/smm/`. Outgoing history is scanned before pushing.
 | Path | Contents |
 | --- | --- |
 | `config/` | Live-editable configs linked by home-manager. |
-| `config/zsh/<host>.zshrc` | Each host's own `.zshrc`, seeded from its existing config during setup. |
+| `config/zsh/` | Shared shell settings and each host's own `.zshrc`. |
 | `manifest/*.json` | Links, Nix packages, Homebrew packages, host implementations, secret references, and NvChad starter metadata. |
 | `manifest/prefs/<bundle-id>.json` | App name, captured version, and allowed preference keys. |
 | `modules/` | nix-darwin packages, defaults, preferences and services; home-manager links and tmux configuration. |
@@ -84,6 +84,12 @@ the tmux theme, services, macOS defaults, and declared app preference keys.
 Homebrew manages the GUI casks in `manifest/homebrew.json`, including Raycast and
 Karabiner's driver-bearing app. Undeclared packages require an explicit decision;
 noninteractive runs leave them alone. Whimsy remains a separately installed browser.
+
+Zsh settings shared by both Macs live in `config/zsh/common.zsh`, linked to
+`~/.config/zsh/common.zsh`. Each `config/zsh/<host>.zshrc` is linked to that Mac's
+`~/.zshrc` and sources the shared file, keeping host-specific initialization and
+overrides in the host file; installers may append there. Setup seeds a new host
+with this source line and its existing local settings, removing shared duplicates.
 
 ## Secrets and Raycast
 

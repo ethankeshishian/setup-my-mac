@@ -6,6 +6,7 @@
   {"name":"kitty","source":"config/kitty.conf","target":".config/kitty/kitty.conf","type":"file","validator":null,"reload":null},
   {"name":"tmux","source":"config/.tmux.conf","target":".tmux.conf","type":"file","validator":"tmux","reload":"tmux"},
   {"name":"zsh","source":"config/zsh/{host}.zshrc","target":".zshrc","type":"file","validator":"zsh","reload":null},
+  {"name":"zsh-common","source":"config/zsh/common.zsh","target":".config/zsh/common.zsh","type":"file","validator":"zsh","reload":null},
   {"name":"p10k","source":"config/.p10k.zsh","target":".p10k.zsh","type":"file","validator":"zsh","reload":null},
   {"name":"mmf","source":"config/mmf/config.plist","target":"Library/Application Support/com.nuebling.mac-mouse-fix/config.plist","type":"file","validator":"plist","reload":null},
   {"name":"nvim","source":"config/nvim","target":".config/nvim","type":"dir","validator":"nvim","reload":null}
