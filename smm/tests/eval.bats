@@ -2,104 +2,162 @@
 
 load helpers
 
+setup_file() {
+  setup_tmp
+  local repo
+  repo="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+  # Remove only this helper's Nix stub; every other system tool stays stubbed.
+  rm -f "$TMP/bin/nix"
+  if ! command -v nix >/dev/null 2>&1; then
+    touch "$BATS_FILE_TMPDIR/nix-missing"
+    return 0
+  fi
+  cd "$repo" || return 1
+  # Project only the values under test: never serialize entire configurations
+  # or realize the out-of-store symlink derivations.
+  # shellcheck disable=SC2016 # ${host} is Nix interpolation, not shell expansion.
+  if ! nix --extra-experimental-features 'nix-command flakes' eval --json --no-write-lock-file '.#' --apply '
+    flake: {
+      hosts = builtins.listToAttrs (map (host:
+        let
+          c = flake.darwinConfigurations.${host}.config;
+          files = c.home-manager.users.ethankeshishian.home.file;
+        in {
+          name = host;
+          value = {
+            nixEnabled = c.nix.enable;
+            dockOrientation = c.system.defaults.dock.orientation;
+            dockExposeGroupApps = c.system.defaults.dock.expose-group-apps;
+            homebrewCasks = map (cask: cask.name) c.homebrew.casks;
+            homebrewActivation = c.homebrew.onActivation;
+            borders = {
+              inherit (c.services.jankyborders) active_color inactive_color width;
+            };
+            sketchybarPackages = map
+              (p: p.pname or (builtins.parseDrvName p.name).name)
+              c.services.sketchybar.extraPackages;
+            sketchybarConfig = c.services.sketchybar.config;
+            localHostName = c.networking.localHostName;
+            aerospaceEnabled = c.services.aerospace.enable;
+            aerospaceService = c.launchd.user.agents.aerospace.serviceConfig;
+            aerospacePath = c.launchd.user.agents.aerospace.path;
+            symbolicHotkeys = c.system.defaults.CustomUserPreferences."com.apple.symbolichotkeys".AppleSymbolicHotKeys;
+            aerospaceLinkCommand = files.".aerospace.toml".source.buildCommand;
+            homeFileNames = builtins.attrNames files;
+            karabinerRecursive = files.".config/karabiner".recursive;
+            backupFileExtension = c.home-manager.backupFileExtension;
+            homeFilesUnforced = builtins.all (file: !file.force) (builtins.attrValues files);
+            tmuxSource = toString files.".config/tmux/plugins/catppuccin/tmux".source;
+            zshLinkCommand = files.".zshrc".source.buildCommand;
+            altTabPrefs = c.system.defaults.CustomUserPreferences."com.lwouis.alt-tab-macos";
+            raycastPrefs = c.system.defaults.CustomUserPreferences."com.raycast.macos";
+          };
+        }) [ "Ethans-MacBook-Pro" "Ethans-MacBook-Pro-Mercury" ]);
+      darwinRebuildName = flake.packages.aarch64-darwin.darwin-rebuild.name;
+      darwinRebuildProgram = flake.apps.aarch64-darwin.darwin-rebuild.program;
+    }
+  ' > "$BATS_FILE_TMPDIR/eval.json" 2> "$BATS_FILE_TMPDIR/eval.error"; then
+    # setup_file must succeed so setup can fail EACH test with the same error.
+    touch "$BATS_FILE_TMPDIR/eval.failed"
+  fi
+}
+
 setup() {
   setup_tmp
   REPO="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
-  rm -f "$TMP/bin/nix"
-  if ! command -v nix >/dev/null 2>&1; then
+  if [ -f "$BATS_FILE_TMPDIR/nix-missing" ]; then
     skip "nix not installed"
   fi
-  cd "$REPO" || return 1
-  FLAKE='.#darwinConfigurations.Ethans-MacBook-Pro.config'
+  if [ -f "$BATS_FILE_TMPDIR/eval.failed" ]; then
+    cat "$BATS_FILE_TMPDIR/eval.error" >&2
+    return 1
+  fi
+  HOST=Ethans-MacBook-Pro
 }
 
 eval_json() {
-  local path=$1
-  shift
-  run nix eval --json --no-write-lock-file "$FLAKE.$path" "$@"
+  run jq -c --arg host "$HOST" ".hosts[\$host].$1" "$BATS_FILE_TMPDIR/eval.json"
   [ "$status" -eq 0 ]
 }
 
 eval_raw() {
-  local path=$1
-  shift
-  run nix eval --raw --no-write-lock-file "$FLAKE.$path" "$@"
+  run jq -r --arg host "$HOST" ".hosts[\$host].$1" "$BATS_FILE_TMPDIR/eval.json"
   [ "$status" -eq 0 ]
 }
 
 @test "host installers manage Nix on both Macs" {
   for host in Ethans-MacBook-Pro Ethans-MacBook-Pro-Mercury; do
-    FLAKE=".#darwinConfigurations.$host.config"
-    eval_json nix.enable
+    HOST=$host
+    eval_json nixEnabled
     [ "$output" = false ]
   done
 }
 
 @test "Dock is on the right" {
-  eval_raw system.defaults.dock.orientation
+  eval_raw dockOrientation
   [ "$output" = right ]
 }
 
 @test "Mission Control groups windows by app" {
-  eval_json system.defaults.dock.expose-group-apps
+  eval_json dockExposeGroupApps
   [ "$output" = true ]
 }
 
 @test "Homebrew declares Arc and Karabiner without nightly Ghostty" {
-  eval_json homebrew.casks --apply 'casks: map (c: c.name) casks'
+  eval_json homebrewCasks
   jq -e 'index("arc") != null and index("karabiner-elements") != null and index("ghostty@tip") == null' <<< "$output"
 }
 
 @test "Homebrew activation never removes undeclared packages" {
-  eval_raw homebrew.onActivation.cleanup
+  eval_raw homebrewActivation.cleanup
   [ "$output" = none ]
 }
 
 @test "Homebrew activation never updates or upgrades packages" {
-  eval_json homebrew.onActivation.autoUpdate
+  eval_json homebrewActivation.autoUpdate
   [ "$output" = false ]
-  eval_json homebrew.onActivation.upgrade
+  eval_json homebrewActivation.upgrade
   [ "$output" = false ]
 }
 
 @test "Borders use the approved appearance" {
-  eval_raw services.jankyborders.active_color
+  eval_raw borders.active_color
   [ "$output" = 0xff3a6aff ]
-  eval_raw services.jankyborders.inactive_color
+  eval_raw borders.inactive_color
   [ "$output" = 0x00494d64 ]
-  eval_json services.jankyborders.width
+  eval_json borders.width
   jq -e '. == 12' <<< "$output"
 }
 
 @test "SketchyBar can call AeroSpace and jq under launchd" {
-  eval_json services.sketchybar.extraPackages --apply 'packages: map (p: p.pname or (builtins.parseDrvName p.name).name) packages'
+  eval_json sketchybarPackages
   jq -e 'index("aerospace") != null and index("jq") != null' <<< "$output"
 }
 
 @test "SketchyBar uses the linked config" {
-  eval_raw services.sketchybar.config
+  eval_raw sketchybarConfig
   [ -z "$output" ]
 }
 
 @test "host identity is fixed" {
-  eval_raw networking.localHostName
+  eval_raw localHostName
   [ "$output" = Ethans-MacBook-Pro ]
 }
 
 @test "AeroSpace generated config service stays disabled" {
-  eval_json services.aerospace.enable
+  eval_json aerospaceEnabled
   [ "$output" = false ]
 }
 
 @test "AeroSpace starts the Nix application with the service tools on PATH" {
-  eval_json launchd.user.agents.aerospace.serviceConfig
+  eval_json aerospaceService
   jq -e '.ProgramArguments == ["/Applications/Nix Apps/AeroSpace.app/Contents/MacOS/AeroSpace"] and .KeepAlive == true and .RunAtLoad == true' <<< "$output"
-  eval_raw launchd.user.agents.aerospace.path
+  eval_raw aerospacePath
   [[ "$output" == *sketchybar*/bin* ]]
 }
 
 @test "symbolic hotkeys preserve the old parameter values" {
-  eval_json 'system.defaults.CustomUserPreferences."com.apple.symbolichotkeys".AppleSymbolicHotKeys'
+  eval_json symbolicHotkeys
   jq -e '."64".enabled == false and ."65".enabled == false and
     ."64".value.parameters == [65535, 49, 1048576] and
     ."65".value.parameters == [65535, 49, 1572864] and
@@ -109,21 +167,20 @@ eval_raw() {
 @test "aerospace link points into repo" {
   # mkOutOfStoreSymlink returns a derivation, not the live target string.
   # Inspect its builder without realizing it or touching the real HOME.
-  eval_raw 'home-manager.users.ethankeshishian.home.file.".aerospace.toml".source' \
-    --apply 'source: source.buildCommand'
+  eval_raw aerospaceLinkCommand
   [[ "$output" == *'ln -s '* ]]
   [[ "$output" == *'/Users/ethankeshishian/Repos/setup-my-mac/config/.aerospace.toml'* ]]
 }
 
 @test "karabiner linked as dir" {
-  eval_json home-manager.users.ethankeshishian.home.file --apply builtins.attrNames
+  eval_json homeFileNames
   jq -e 'index(".config/karabiner") != null and index(".config/karabiner/karabiner.json") == null' <<< "$output"
-  eval_json 'home-manager.users.ethankeshishian.home.file.".config/karabiner".recursive'
+  eval_json karabinerRecursive
   [ "$output" = false ]
 }
 
 @test "link count equals manifest count" {
-  eval_json home-manager.users.ethankeshishian.home.file --apply builtins.attrNames
+  eval_json homeFileNames
   [ "$(jq length <<< "$output")" -eq "$(($(jq length "$REPO/manifest/links.json") + 1))" ]
   jq -r '.[].target' "$REPO/manifest/links.json" | LC_ALL=C sort > "$TMP/expected"
   jq -r '.[] | select(. != ".config/tmux/plugins/catppuccin/tmux")' <<< "$output" | LC_ALL=C sort > "$TMP/actual"
@@ -131,37 +188,36 @@ eval_raw() {
 }
 
 @test "home-manager never renames conflicting files" {
-  eval_json home-manager.backupFileExtension
+  eval_json backupFileExtension
   [ "$output" = null ]
-  eval_json home-manager.users.ethankeshishian.home.file \
-    --apply 'files: builtins.all (file: !file.force) (builtins.attrValues files)'
+  eval_json homeFilesUnforced
   [ "$output" = true ]
 }
 
 @test "flake exposes bootstrap darwin-rebuild package and app" {
-  run nix eval --raw --no-write-lock-file '.#packages.aarch64-darwin.darwin-rebuild.name'
+  run jq -r '.darwinRebuildName' "$BATS_FILE_TMPDIR/eval.json"
   [ "$status" -eq 0 ]; [[ "$output" == *darwin-rebuild* ]]
-  run nix eval --raw --no-write-lock-file '.#apps.aarch64-darwin.darwin-rebuild.program'
+  run jq -r '.darwinRebuildProgram' "$BATS_FILE_TMPDIR/eval.json"
   [ "$status" -eq 0 ]; [[ "$output" == */bin/darwin-rebuild ]]
 }
 
 @test "tmux Catppuccin comes from the pinned Nix package" {
-  eval_raw 'home-manager.users.ethankeshishian.home.file.".config/tmux/plugins/catppuccin/tmux".source'
+  eval_raw tmuxSource
   [[ "$output" == /nix/store/*/share/tmux-plugins/catppuccin ]]
 }
 
 @test "zsh source uses each darwin local host identity" {
   for host in Ethans-MacBook-Pro Ethans-MacBook-Pro-Mercury; do
-    FLAKE=".#darwinConfigurations.$host.config"
-    eval_raw 'home-manager.users.ethankeshishian.home.file.".zshrc".source' --apply 'source: source.buildCommand'
+    HOST=$host
+    eval_raw zshLinkCommand
     [[ "$output" == *"/config/zsh/$host.zshrc"* ]]
     [[ "$output" != *'{host}'* ]]
   done
 }
 
 @test "app preferences come from versioned manifests" {
-  eval_json 'system.defaults.CustomUserPreferences."com.lwouis.alt-tab-macos"'
+  eval_json altTabPrefs
   [ "$(jq -cS . <<< "$output")" = "$(jq -cS .keys "$REPO/manifest/prefs/com.lwouis.alt-tab-macos.json")" ]
-  eval_json 'system.defaults.CustomUserPreferences."com.raycast.macos"'
+  eval_json raycastPrefs
   [ "$(jq -cS . <<< "$output")" = '{"raycastGlobalHotkey":"Command-49"}' ]
 }
