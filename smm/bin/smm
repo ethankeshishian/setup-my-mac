@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Follow symlinks so this also works from a PATH entry outside the repo.
+smm_path=${BASH_SOURCE[0]}
+while [ -L "$smm_path" ]; do
+  smm_dir=$(cd -P "$(dirname "$smm_path")" && pwd)
+  smm_path=$(readlink "$smm_path")
+  case "$smm_path" in
+    /*) ;;
+    *) smm_path="$smm_dir/$smm_path" ;;
+  esac
+done
+smm_root=$(cd -P "$(dirname "$smm_path")/.." && pwd)
+for smm_file in "$smm_root"/lib/*.sh "$smm_root"/cmd/*.sh; do
+  [ -f "$smm_file" ] || continue
+  # shellcheck source=/dev/null
+  source "$smm_file"
+done
+
+if [ "${1:-}" = -y ]; then
+  export SMM_YES=1
+  shift
+fi
+case "${1:---help}" in
+  --help|-h)
+    printf '%s\n' 'Usage: smm [-y] <command> [args]' \
+      'Commands: setup apply sync add remove status upgrade undo validate'
+    ;;
+  setup|apply|sync|add|remove|status|upgrade|undo|validate)
+    smm_command="cmd_$1"
+    shift
+    if declare -F "$smm_command" >/dev/null; then
+      "$smm_command" "$@"
+    else
+      printf 'smm: command not implemented yet: %s\n' "${smm_command#cmd_}" >&2
+      exit 2
+    fi
+    ;;
+  *) printf 'smm: unknown command: %s\n' "$1" >&2; exit 2 ;;
+esac
