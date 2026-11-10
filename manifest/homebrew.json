@@ -1,0 +1,25 @@
+{
+  "taps": [],
+  "brews": ["tpm"],
+  "casks": [
+    "spotify",
+    "arc",
+    "todoist",
+    "obsidian",
+    "clay",
+    "notion-calendar",
+    "raindropio",
+    "visual-studio-code",
+    "mos",
+    "mac-mouse-fix@2",
+    "betterdisplay",
+    "alt-tab",
+    "logi-options+",
+    "raycast",
+    "karabiner-elements",
+    "font-martian-mono-nerd-font",
+    "font-hack-nerd-font",
+    "1password",
+    "1password-cli"
+  ]
+}

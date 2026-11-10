@@ -1,0 +1,11 @@
+[
+  {"name":"aerospace","source":"config/.aerospace.toml","target":".aerospace.toml","type":"file","validator":"aerospace","reload":"aerospace"},
+  {"name":"sketchybar","source":"config/sketchybar","target":".config/sketchybar","type":"dir","validator":"sketchybar","reload":"sketchybar"},
+  {"name":"ghostty","source":"config/ghostty","target":".config/ghostty","type":"dir","validator":"ghostty","reload":null},
+  {"name":"karabiner","source":"config/karabiner","target":".config/karabiner","type":"dir","validator":"karabiner","reload":null},
+  {"name":"kitty","source":"config/kitty.conf","target":".config/kitty/kitty.conf","type":"file","validator":null,"reload":null},
+  {"name":"tmux","source":"config/.tmux.conf","target":".tmux.conf","type":"file","validator":"tmux","reload":"tmux"},
+  {"name":"zsh","source":"config/.zshrc","target":".zshrc","type":"file","validator":"zsh","reload":null},
+  {"name":"p10k","source":"config/.p10k.zsh","target":".p10k.zsh","type":"file","validator":"zsh","reload":null},
+  {"name":"mmf","source":"config/mmf/config.plist","target":"Library/Application Support/com.nuebling.mac-mouse-fix/config.plist","type":"file","validator":"plist","reload":null}
+]
