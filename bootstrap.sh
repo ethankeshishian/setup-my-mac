@@ -41,4 +41,4 @@ if [ ! -d "$repo/.git" ]; then
   mkdir -p "$(dirname "$repo")"
   nix run nixpkgs#git -- clone https://github.com/ethankeshishian/setup-my-mac "$repo"
 fi
-exec nix run "$repo#smm" -- setup
+exec nix run "$repo#smm" -- setup </dev/tty

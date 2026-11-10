@@ -34,12 +34,12 @@ setup() {
   ln -s "$SMM_REPO/config/test" "$HOME/.test"
   run smm_migrate_status test; [ "$output" = linked ]
 }
-@test "resolve backs up before removing target and keeps local selection" {
+@test "resolve backs up and retains target until activation and keeps local selection" {
   echo local > "$HOME/.test"
   choose() { echo 'use this Mac'; }
   run smm_migrate_resolve test; [ "$status" -eq 0 ]
   [[ "$output" == *'-original'*'+local'* ]]
-  [ "$(cat "$SMM_BACKUP/.test")" = local ]; [ ! -e "$HOME/.test" ]
+  [ "$(cat "$SMM_BACKUP/.test")" = local ]; [ -e "$HOME/.test" ]
   [ "$(cat "$SMM_REPO/config/test")" = local ]
 }
 @test "pick changes keeps only chosen hunks" {
@@ -90,7 +90,7 @@ setup() {
   git -C "$SMM_REPO" add -A; git -C "$SMM_REPO" commit -qm update
   choose() { return 99; }
   run smm_migrate_resolve test; [ "$status" -eq 0 ]
-  [ ! -e "$HOME/.test" ]; [ "$(cat "$SMM_BACKUP/.test")" = original ]
+  [ -e "$HOME/.test" ]; [ "$(cat "$SMM_BACKUP/.test")" = original ]
   [ "$(cat "$SMM_REPO/config/test")" = updated ]
 }
 @test "lazylock prefers repo when plugin commits have diverged" {

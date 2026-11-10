@@ -46,6 +46,11 @@
           && (builtins.readDir ./hosts).${file} == "regular")
           (builtins.attrNames (builtins.readDir ./hosts))));
 
+      packages.${system}.darwin-rebuild = nix-darwin.packages.${system}.darwin-rebuild;
+      apps.${system}.darwin-rebuild = {
+        type = "app";
+        program = "${nix-darwin.packages.${system}.darwin-rebuild}/bin/darwin-rebuild";
+      };
       packages.${system}.smm = pkgs.callPackage ./smm/package.nix { };
       apps.${system}.smm = {
         type = "app";

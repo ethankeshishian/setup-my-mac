@@ -9,8 +9,9 @@ setup() {
   printf '{}\n' > "$SMM_REPO/manifest/homebrew.json"
   source "$REPO/smm/lib/common.sh"
   source "$REPO/smm/lib/build.sh"
+  source "$REPO/smm/lib/transaction.sh"
   stub scutil 0 Test-Mac
-  stub darwin-rebuild 0
+  stub darwin-rebuild 0 '42 date (current)'
   stub sudo 0
   sed -i '' 's/exit 0/exec "$@"/' "$TMP/bin/sudo"
 }
@@ -39,28 +40,36 @@ setup() {
 }
 @test "build failure leaves applied hash untouched" {
   printf old > "$SMM_STATE/applied.hash"
-  stub darwin-rebuild 1
+  stub darwin-rebuild 0 '42 date (current)'
+  sed -i '' '/exit 0/i\
+[ "$1" != build ] || exit 1\
+' "$TMP/bin/darwin-rebuild"
   run smm_build
   [ "$status" -ne 0 ]
   [ "$(cat "$SMM_STATE/applied.hash")" = old ]
   [ ! -e "$SMM_STATE/last-build" ]
 }
-@test "build records output path and switch stores hash only on success" {
+@test "build records output path and hash finalizes separately after switch" {
   mkdir "$SMM_REPO/built-system"
   ln -s built-system "$SMM_REPO/result"
   smm_build
   [ "$(cat "$SMM_STATE/last-build")" = "$(cd -P "$SMM_REPO/built-system" && pwd)" ]
   calls | grep -qx "darwin-rebuild build --flake $SMM_REPO#Test-Mac"
   smm_switch
+  [ ! -f "$SMM_STATE/applied.hash" ]
+  smm_finalize_apply
   [ "$(cat "$SMM_STATE/applied.hash")" = "$(smm_nix_inputs_hash)" ]
   printf old > "$SMM_STATE/applied.hash"
-  stub darwin-rebuild 1
+  stub darwin-rebuild 0 '42 date (current)'
+  sed -i '' '/exit 0/i\
+[ "$1" != switch ] || exit 1\
+' "$TMP/bin/darwin-rebuild"
   run smm_switch
   [ "$status" -ne 0 ]
   [ "$(cat "$SMM_STATE/applied.hash")" = old ]
 }
-@test "missing current generation fails" {
+@test "missing current generation means initial activation" {
   stub darwin-rebuild 0 '41 date'
   run smm_generation
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 0 ]; [ -z "$output" ]
 }

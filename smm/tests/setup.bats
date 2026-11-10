@@ -2,7 +2,7 @@
 load helpers
 setup() {
   setup_tmp
-  REPO="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+  export REPO="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
   export SMM_REPO="$HOME/Repos/setup-my-mac"
   make_repo "$SMM_REPO"
   mkdir -p "$SMM_REPO/manifest" "$SMM_REPO/hosts"
@@ -57,7 +57,7 @@ fixture_steps() {
   confirm() { return 0; }
   run cmd_setup; [ "$status" -eq 0 ]
   [ "$(calls | grep -c '^osascript ')" -eq 1 ]
-  [ "$(calls | head -n 1)" = health ]
+  [ "$(calls | grep -E '^(health|osascript )' | head -n 1)" = health ]
   [ "$(wc -l < "$SMM_STATE/restart-needed" | tr -d ' ')" -eq 1 ]
 }
 @test "preview flag stops before configs and writes nothing" {
@@ -88,18 +88,19 @@ fixture_steps() {
   run smm_wait_permission karabiner; [ "$status" -eq 1 ]
   calls | grep -Fq 'Privacy_ListenEvent'; calls | grep -Fq 'ExtensionItems'
 }
-@test "same configs backed up and cleared so home-manager can link" {
+@test "same configs backed up and retained until activation" {
   echo '[{"name":"test","source":"config/test","target":".test","type":"file"}]' > "$SMM_REPO/manifest/links.json"
   mkdir "$SMM_REPO/config"; echo data > "$SMM_REPO/config/test"
   cp "$SMM_REPO/config/test" "$HOME/.test"
   git -C "$SMM_REPO" add -A; git -C "$SMM_REPO" commit -qm fixture
   export SMM_BACKUP="$TMP/backup"
   run step_configs_run; [ "$status" -eq 0 ]
-  [ ! -e "$HOME/.test" ]; [ "$(cat "$SMM_BACKUP/.test")" = data ]
+  [ "$(cat "$HOME/.test")" = data ]; [ "$(cat "$SMM_BACKUP/.test")" = data ]
 }
 @test "host step uses template and validates names" {
   stub scutil 0 New-Mac
-  run step_host_run <<< New-Mac; [ "$status" -eq 0 ]
+  export SMM_TEST_TTY_INPUT=New-Mac
+  run run_tty /bin/bash -c 'for file in "$REPO"/smm/lib/*.sh; do source "$file"; done; step_host_run'; [ "$status" -eq 0 ]
   [ "$(rg -c '"New-Mac"' "$SMM_REPO/hosts/New-Mac.nix")" -eq 3 ]
   run step_host_done; [ "$status" -eq 0 ]
 }
@@ -172,7 +173,8 @@ esac\
 }
 @test "new host is tracked before a Git flake build can discover it" {
   stub scutil 0 New-Mac
-  run step_host_run <<< New-Mac; [ "$status" -eq 0 ]
+  export SMM_TEST_TTY_INPUT=New-Mac
+  run run_tty /bin/bash -c 'for file in "$REPO"/smm/lib/*.sh; do source "$file"; done; step_host_run'; [ "$status" -eq 0 ]
   git -C "$SMM_REPO" ls-files --error-unmatch hosts/New-Mac.nix
   [ "$(git -C "$SMM_REPO" show --format= --name-only HEAD)" = hosts/New-Mac.nix ]
 }

@@ -42,10 +42,20 @@ smm_sync_merge_validated() (
     done <<< "$conflicts"
     git -C "$wt" commit --no-edit || exit 1
   fi
-  if ! smm_run_validate "$wt"; then
+  # AeroSpace parses in the old running server, before dedupe/activation.
+  if ! smm_run_validate "$wt" aerospace; then
+    warn "incoming change breaks ${SMM_FAILED_LINKS:-config}; this Mac stays as is"
+    exit 1
+  fi
+  if ! SMM_REPO="$wt" smm_build; then
+    warn 'incoming system build failed; this Mac stays as is'; exit 1
+  fi
+  smm_use_build_tools || exit 1
+  if ! SMM_SKIP_AEROSPACE=1 smm_run_validate "$wt"; then
     warn "incoming change breaks ${SMM_FAILED_LINKS:-config}; this Mac stays as is"
     exit 1
   fi
   merged=$(git -C "$wt" rev-parse HEAD) || exit 1
+  if [ -n "${SMM_TX:-}" ]; then touch "$SMM_TX/merged" || exit 1; fi
   git -C "$repo" merge --ff-only "$merged" || exit 1
 )

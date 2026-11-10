@@ -5,7 +5,7 @@ setup() {
   REPO="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
   export SMM_REPO="$TMP/repo"
   make_repo "$SMM_REPO"
-  mkdir -p "$SMM_REPO/manifest" "$SMM_REPO/config" "$SMM_REPO/result"
+  mkdir -p "$SMM_REPO/manifest" "$SMM_REPO/config" "$SMM_REPO/result/sw/bin"
   printf '%s\n' '[{"name":"aerospace","source":"config/aero","target":".aerospace.toml","validator":"aerospace","reload":"aerospace"},{"name":"sketchybar","source":"config/bar","target":".bar","validator":null,"reload":"sketchybar"}]' > "$SMM_REPO/manifest/links.json"
   printf '%s\n' '{"taps":[],"brews":[],"casks":[]}' > "$SMM_REPO/manifest/homebrew.json"
   printf '[]\n' > "$SMM_REPO/manifest/secrets.json"
@@ -84,13 +84,16 @@ if [[ "$*" == *--dry-run* ]]; then echo broken; exit 1; fi\
   [[ "$output" == *'broken links:'*'aerospace'* ]]
   [[ "$output" == *'GitHub not signed in'* ]]
 }
-@test "accessibility failure prints instructions without rollback" {
+@test "cancelled accessibility wait rolls back without finalizing" {
   rm "$SMM_STATE/applied.hash"
-  stub aerospace 1
+  stub aerospace 0
+  sed -i '' '/exit 0/i\
+[ "$1" != list-workspaces ] || exit 1\
+' "$TMP/bin/aerospace"
   run "$REPO/smm/bin/smm" apply
   [ "$status" -eq 1 ]
   [[ "$output" == *Accessibility* ]]
-  ! calls | grep -q switch-generation
+  calls | grep -q switch-generation
 }
 @test "invalid manifest aborts before build or reload" {
   printf broken > "$SMM_REPO/manifest/links.json"
@@ -120,7 +123,10 @@ if [[ "$*" == *--dry-run* ]]; then echo broken; exit 1; fi\
 @test "remaining service failure after permission grant rolls back" {
   source "$REPO/smm/cmd/apply.sh"
   rm "$SMM_STATE/applied.hash"
-  stub aerospace 1
+  stub aerospace 0
+  sed -i '' '/exit 0/i\
+[ "$1" != list-workspaces ] || exit 1\
+' "$TMP/bin/aerospace"
   stub pgrep 0
   sed -i '' '/exit 0/i\
 [ "$2" != borders ] || exit 1\

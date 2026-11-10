@@ -33,13 +33,29 @@ smm_wait_permission() {
   esac
   if [ "$check_status" -eq 127 ] || ! command -v "$checker" >/dev/null 2>&1; then confirm 'Done?'; return "$?"; fi
   # A noninteractive caller cannot grant permission; fail with the pane open.
-  [ -t 0 ] || return 1
+  smm_has_tty || return 1
   while ! smm_permission_granted "$app"; do sleep 2; done
 }
+smm_restart_pending() {
+  local state boot recorded
+  state=$(smm_state_dir) || return 1
+  boot=$(sysctl -n kern.boottime) || return 1
+  [ -s "$state/restart-needed" ] || return 1
+  recorded=$(cat "$state/restart-boot" 2>/dev/null) || recorded=''
+  if [ "$recorded" != "$boot" ]; then
+    rm -f "$state/restart-needed" "$state/restart-boot"
+    return 1
+  fi
+}
 smm_need_restart() {
-  local file
-  file="$(smm_state_dir)/restart-needed" || return 1
-  if [ ! -f "$file" ] || ! grep -Fxq -- "$1" "$file"; then printf '%s\n' "$1" >> "$file"; fi
+  local state boot
+  state=$(smm_state_dir) || return 1
+  boot=$(sysctl -n kern.boottime) || return 1
+  smm_restart_pending || :
+  printf '%s\n' "$boot" > "$state/restart-boot" || return 1
+  if [ ! -f "$state/restart-needed" ] || ! grep -Fxq -- "$1" "$state/restart-needed"; then
+    printf '%s\n' "$1" >> "$state/restart-needed"
+  fi
 }
 
 step_preflight_done() {
@@ -81,7 +97,7 @@ step_host_run() {
   local current host repo
   repo=$(smm_repo); current=$(smm_host) || return 1
   printf 'Host name [%s]: ' "$current" >&2
-  IFS= read -r host || return 1
+  IFS= read -r host </dev/tty || return 1
   host=${host:-$current}
   case "$host" in ''|*[!a-zA-Z0-9-]*|-*|template) warn 'invalid host name'; return 1 ;; esac
   [ "${#host}" -le 63 ] || return 1
@@ -97,7 +113,7 @@ step_host_run() {
   export SMM_HOST="$host"
 }
 step_preview_done() { return 1; }
-step_preview_run() { smm_migrate_preview && confirm 'Continue?'; }
+step_preview_run() { smm_migrate_preview && smm_run_validate "$(smm_repo)" aerospace && confirm 'Continue?'; }
 step_configs_done() {
   local names name status
   names=$(link_names) || return 1
@@ -108,11 +124,20 @@ step_configs_done() {
   done <<< "$names"
 }
 step_configs_run() {
-  local names name status target backup saved
+  local names name status target backup saved source
+  [ -n "${SMM_TX:-}" ] || smm_tx_begin setup || return 1
   names=$(link_names) || return 1
   while IFS= read -r name; do
     [ -n "$name" ] || continue
     status=$(smm_migrate_status "$name") || return 1
+    target=$(link_field "$name" target) || return 1
+    smm_safe_relative "$target" || return 1
+    smm_tx_watch "$HOME/$target" target || return 1
+    source=$(link_field "$name" source) || return 1
+    smm_config_source_safe "$source" || return 1
+    if [ "$status" != linked ] && [ "$status" != missing ]; then
+      smm_tx_arm "$(smm_repo)/$source" || return 1
+    fi
     if [ "$status" = same ]; then
       # The migration resolver deliberately leaves identical files alone.
       # Activation still needs the real target cleared, with its own backup.
@@ -122,7 +147,6 @@ step_configs_run() {
       saved="$backup/$target"
       if [ -e "$saved" ] || [ -L "$saved" ]; then saved=$(mktemp -d "$backup/retry.XXXXXX")/original; fi
       cp -a "$HOME/$target" "$saved" || return 1
-      rm -rf "${HOME:?}/${target:?}" || return 1
     else smm_migrate_resolve "$name" || return 1; fi
   done <<< "$names"
 }
@@ -151,6 +175,7 @@ step_brew_adopt_run() {
   # shellcheck disable=SC2034 # Dynamically scoped input to smm_brew_resolve.
   SMM_BREW_EXCLUDE=$(smm_brew_duplicates) || return 1
   # Nix duplicates are removed only after the replacement has built successfully.
+  if [ -n "${SMM_TX:-}" ]; then smm_tx_arm "$(smm_repo)/manifest/homebrew.json" || return 1; fi
   smm_setup_prune_duplicates && smm_brew_resolve
 }
 step_build_done() {
@@ -203,17 +228,20 @@ smm_setup_restore_brew() {
   return "$failed"
 }
 smm_setup_recover() {
-  local file failed=0
+  local file failed=0 previous=''
   export PATH="${SMM_SETUP_ORIGINAL_PATH:-$PATH}"
   file="$(smm_state_dir)/setup-generation"
-  if [ -s "$file" ]; then
-    smm_rollback "$(cat "$file")" || failed=1
-    smm_reload || :
+  if [ -f "$file" ]; then
+    previous=$(cat "$file") || return 1
+    smm_rollback "$previous" || failed=1
     [ "$failed" -ne 0 ] || rm -f "$file"
   fi
+  if [ -n "${SMM_TX:-}" ]; then smm_tx_restore || failed=1; fi
   smm_setup_restore_brew || failed=1
+  if [ -n "$previous" ]; then smm_reload || :; fi
   return "$failed"
 }
+
 step_switch_done() { ! smm_nix_changed && step_configs_linked; }
 step_configs_linked() {
   local name names
@@ -224,13 +252,28 @@ step_configs_linked() {
   done <<< "$names"
 }
 step_switch_run() {
-  local state
+  local state prev names name target
   state=$(smm_state_dir) || return 1
-  smm_use_build_tools && smm_run_validate "$(smm_repo)" || return 1
-  smm_generation > "$state/setup-generation" || return 1
+  smm_use_build_tools && SMM_SKIP_AEROSPACE=1 smm_run_validate "$(smm_repo)" || return 1
+  if [ -n "${SMM_TX:-}" ]; then
+    # The configs step can be skipped on a fresh Mac. Journal absent targets too.
+    names=$(link_names) || return 1
+    while IFS= read -r name; do
+      [ -n "$name" ] || continue
+      target=$(link_field "$name" target) || return 1
+      smm_safe_relative "$target" && smm_tx_watch "$HOME/$target" target || return 1
+    done <<< "$names"
+  fi
+  prev=$(smm_generation) || return 1
+  printf '%s\n' "$prev" > "$state/setup-generation" || return 1
+  if [ -n "${SMM_TX:-}" ]; then
+    smm_tx_arm "$state/applied.hash" && smm_tx_clear_targets || return 1
+  fi
   if ! smm_switch; then smm_setup_recover || warn 'recovery incomplete'; return 1; fi
+  smm_run_validate "$(smm_repo)" aerospace || return 1
   smm_need_restart 'macOS menu bar and symbolic hotkey defaults' || return 1
 }
+
 step_permissions_done() { smm_permission_granted aerospace && smm_permission_granted karabiner; }
 step_permissions_run() {
   smm_wait_permission aerospace || return 1
@@ -242,7 +285,7 @@ step_signin_run() {
   file="$(smm_state_dir)/signin-skipped"
   : > "$file"
   if ! op whoami >/dev/null 2>&1; then
-    if [ -t 0 ] && confirm 'Sign in to 1Password now?'; then
+    if smm_has_tty && confirm 'Sign in to 1Password now?'; then
       open -a '1Password' || return 1
       while ! op whoami >/dev/null 2>&1; do
         confirm 'Enable 1Password CLI integration. Done (or cancel to skip)?' || break
@@ -251,7 +294,7 @@ step_signin_run() {
     op whoami >/dev/null 2>&1 || printf '1Password not signed in (weather disabled)\n' >> "$file"
   fi
   if ! gh auth status >/dev/null 2>&1; then
-    if [ -t 0 ] && confirm 'Sign in to GitHub now?'; then gh auth login || :; fi
+    if smm_has_tty && confirm 'Sign in to GitHub now?'; then gh auth login || :; fi
     gh auth status >/dev/null 2>&1 || printf 'GitHub not signed in (push disabled)\n' >> "$file"
   fi
   if [ -s "$file" ]; then warn "degraded: $(cat "$file")"; fi
@@ -269,7 +312,7 @@ step_secrets_done() {
 smm_setup_read_secret() {
   local value
   printf 'Paste the secret field contents (one line): ' >&2
-  IFS= read -r -s value || return 1
+  IFS= read -r -s value </dev/tty || return 1
   printf '\n' >&2
   [ -n "$value" ] || return 1
   printf '%s\n' "$value" > "$1"
@@ -323,17 +366,11 @@ step_nvim_run() {
   smm_nvim_run '+Lazy! restore' '+TSUpdateSync' || return 1
   validate_nvim "$(smm_repo)/config/nvim"
 }
-step_health_done() {
-  # Finalize recovery only after the complete health check passes.
-  smm_health || return 1
-  rm -f "$(smm_state_dir)/setup-generation"
-  : > "$(smm_state_dir)/deduped"
-}
+step_health_done() { smm_health; }
 step_health_run() {
   if ! smm_health; then smm_setup_recover || warn 'recovery incomplete'; return 1; fi
-  rm -f "$(smm_state_dir)/setup-generation"
-  : > "$(smm_state_dir)/deduped"
 }
+
 step_commit_done() {
   local repo
   repo=$(smm_repo)
@@ -347,7 +384,7 @@ step_commit_run() (
   if [ -n "$(git status --porcelain)" ]; then
     smm_run_validate "$(smm_repo)" || exit 1
     printf 'Commit message: ' >&2
-    IFS= read -r message || exit 1
+    IFS= read -r message </dev/tty || exit 1
     case "$message" in *[![:space:]]*) ;; *) warn 'empty commit message'; exit 1 ;; esac
     git add -A && git commit -m "$message" || exit 1
   fi
@@ -364,7 +401,7 @@ step_finish_run() {
   log 'Setup complete. Still manual: App Store and iCloud sign-in.'
   [ ! -s "$state/signin-skipped" ] || cat "$state/signin-skipped"
   [ ! -s "$state/secrets-skipped" ] || cat "$state/secrets-skipped"
-  if [ -s "$state/restart-needed" ]; then
+  if smm_restart_pending; then
     log 'Restart needed:'; cat "$state/restart-needed"
     if confirm 'Restart now?'; then osascript -e 'tell app "System Events" to restart'; fi
   fi

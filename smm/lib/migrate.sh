@@ -47,6 +47,7 @@ smm_migrate_status() (
 
 # Output uses the same brew/cask vocabulary as the drift helpers.
 smm_brew_duplicates() {
+  command -v brew >/dev/null 2>&1 || return 0
   local packages kind name short candidate alias installed
   packages=$(jq -r '.[]' "$(smm_repo)/manifest/nix-packages.json") || return 1
   for kind in brew cask; do
@@ -131,7 +132,6 @@ smm_migrate_resolve() (
       fi ;;
     *) exit 1 ;;
   esac
-  rm -rf "${live:?}" || exit 1
   log "$name: $answer; backup: $saved"
 )
 

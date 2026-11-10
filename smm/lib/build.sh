@@ -25,29 +25,51 @@ smm_build() (
   host=$(smm_host) || exit 1
   state=$(smm_state_dir) || exit 1
   cd "$repo" || exit 1
-  darwin-rebuild build --flake "$repo#$host" || exit "$?"
+  smm_rebuild build --flake "$repo#$host" || exit "$?"
   result=$(cd -P result && pwd) || exit 1
   printf '%s\n' "$result" > "$state/last-build"
 )
+# Bootstrap nix-darwin before its executable is installed by first activation.
+smm_rebuild() {
+  local generation
+  if command -v darwin-rebuild >/dev/null 2>&1; then
+    if [ "${1:-}" = --list-generations ]; then darwin-rebuild "$@"; return "$?"; fi
+    generation=$(smm_generation) || return 1
+    if [ -n "$generation" ]; then darwin-rebuild "$@"; return "$?"; fi
+  fi
+  nix run "$(smm_repo)#darwin-rebuild" -- "$@"
+}
+smm_rebuild_sudo() {
+  local generation
+  if command -v darwin-rebuild >/dev/null 2>&1; then
+    generation=$(smm_generation) || return 1
+    if [ -n "$generation" ]; then sudo darwin-rebuild "$@"; return "$?"; fi
+  fi
+  sudo nix run "$(smm_repo)#darwin-rebuild" -- "$@"
+}
+
 smm_generation() {
   local generations
-  generations=$(darwin-rebuild --list-generations) || return 1
-  awk '/\(current\)/ && $1 ~ /^[0-9]+$/ { print $1; found=1; exit } END { if (!found) exit 1 }' <<< "$generations"
+  if ! generations=$(smm_rebuild --list-generations); then
+    # A fresh Mac has no system profile yet.
+    [ ! -e /nix/var/nix/profiles/system ] && return 0
+    return 1
+  fi
+  awk '/\(current\)/ && $1 ~ /^[0-9]+$/ { print $1; exit }' <<< "$generations"
 }
 smm_switch() {
-  local repo host state hash
+  local repo host
   repo=$(smm_repo) || return 1
   host=$(smm_host) || return 1
-  state=$(smm_state_dir) || return 1
-  hash=$(smm_nix_inputs_hash) || return 1
-  sudo darwin-rebuild switch --flake "$repo#$host" || return "$?"
-  printf '%s\n' "$hash" > "$state/applied.hash"
+  smm_rebuild_sudo switch --flake "$repo#$host"
 }
 smm_rollback() {
   local state
-  case "$1" in ''|*[!0-9]*) warn 'invalid generation'; return 2 ;; esac
+  # Empty means initial activation: callers restore files and deduped packages.
+  [ -n "$1" ] || return 0
+  case "$1" in *[!0-9]*) warn 'invalid generation'; return 2 ;; esac
   state=$(smm_state_dir) || return 1
-  sudo darwin-rebuild switch --switch-generation "$1" || return "$?"
+  smm_rebuild_sudo switch --switch-generation "$1" || return "$?"
   rm -f "$state/applied.hash"
 }
 

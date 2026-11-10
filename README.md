@@ -5,6 +5,20 @@ The repository lives at `~/Repos/setup-my-mac`. Configs link directly into
 `config/`, so editing a linked file edits the repo. JSON manifests declare
 links, Nix packages, Homebrew packages, and 1Password secret references.
 
+## First Mac: pin inputs before migration
+
+The first step on the first Mac, once Nix is available, is `nix flake lock`
+and committing the resulting `flake.lock` before running setup or bootstrap:
+
+```bash
+cd ~/Repos/setup-my-mac
+nix flake lock
+git add flake.lock
+git commit -m "Pin Nix inputs before migration"
+```
+
+Share that commit with every Mac so they use the same pinned versions.
+
 ## New Mac
 
 On an arm64 Mac running macOS 27:
@@ -47,7 +61,7 @@ explicit removal. The old `setup-my-mac.sh` is retired.
 | --- | --- | --- |
 | `smm setup` | Fresh Mac or migration | Compare, back up, build, link configs, guide permissions and sign-ins; safe to rerun. `--preview` shows differences first. |
 | `smm apply` | After editing configs | Validate, rebuild changed Nix inputs, activate and check health, then reload valid apps. Failed configs remain untouched and are reported. Versions stay pinned. |
-| `smm sync` | Moving between Macs | Validate local edits, prompt for a commit message (or use `-m "message"`), validate incoming changes in a temporary worktree, scan outgoing history, push, and apply. Conflicts require a choice. Offline runs stop before a local commit. |
+| `smm sync` | Moving between Macs | Validate local edits, prompt for a commit message (or use `-m "message"`), build and validate incoming changes in a temporary worktree, scan outgoing history, apply, then push. Conflicts require a choice. Offline runs stop before a local commit. |
 | `smm add <path>` | Keep a local config | Copy into `config/`, declare and link it, then apply. Use `--name <name>` to override the default name. Leaves changes uncommitted. |
 | `smm remove <name>` | Stop managing a config | Ask whether to keep a normal local copy or delete it, remove its declaration and repo source, then apply. Keeps a backup. |
 | `smm status` | Inspect changes and drift | Show uncommitted edits, ahead/behind commits, undeclared Homebrew packages, broken links and degraded sign-ins or secrets. |

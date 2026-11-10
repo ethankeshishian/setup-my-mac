@@ -22,7 +22,7 @@ cmd_status() {
   changes=''
   while IFS=$'\t' read -r name source target; do
     [ -n "$name" ] || continue
-    if [ ! -L "$HOME/$target" ] || [ "$(readlink "$HOME/$target")" != "$repo/$source" ]; then
+    if ! smm_linked_to "$HOME/$target" "$repo/$source"; then
       changes="${changes}${name}: ~/${target}"$'\n'
     fi
   done < <(jq -r '.[] | [.name,.source,.target] | @tsv' "$repo/manifest/links.json")

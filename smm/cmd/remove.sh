@@ -12,7 +12,7 @@ cmd_remove() (
   case "$parent/" in "$home/"*) ;; *) warn 'target parent escapes HOME'; exit 1 ;; esac
   real_repo=$(cd "$repo" && pwd -P) || exit 1
   case "$parent/" in "$real_repo/"*) warn 'target is inside the repo'; exit 1 ;; esac
-  [ -L "$dest" ] && [ "$(readlink "$dest")" = "$repo/$source" ] || { warn 'target has drifted; reconcile it before removing'; exit 1; }
+  smm_linked_to "$dest" "$repo/$source" || { warn 'target has drifted; reconcile it before removing'; exit 1; }
   # Refuse shared sources; removing one must never break a remaining link.
   jq -e --arg name "$name" --arg source "$source" '
     all(.[]; . as $entry | .name == $name or (.source != $source and
@@ -43,7 +43,7 @@ cmd_remove() (
   cp "$transaction/new.json" "$manifest" || exit 1
   smm_run_apply || exit 1
   # home-manager may retain a previously managed link; remove only our link.
-  if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$repo/$source" ]; then rm "$dest" || exit 1; fi
+  if smm_linked_to "$dest" "$repo/$source"; then rm "$dest" || exit 1; fi
   [ ! -e "$dest" ] && [ ! -L "$dest" ] || { warn 'target changed during apply; backup retained'; exit 1; }
   if [ "$answer" = 'keep file' ]; then cp -a "$transaction/original" "$dest" || exit 1; fi
   # Leave deletion unstaged for the coordinator / next smm sync.

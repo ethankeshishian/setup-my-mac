@@ -5,6 +5,7 @@ load helpers
 setup() {
   setup_tmp
   REPO="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+  rm -f "$TMP/bin/nix"
   if ! command -v nix >/dev/null 2>&1; then
     skip "nix not installed"
   fi
@@ -132,4 +133,11 @@ eval_raw() {
   eval_json home-manager.users.ethankeshishian.home.file \
     --apply 'files: builtins.all (file: !file.force) (builtins.attrValues files)'
   [ "$output" = true ]
+}
+
+@test "flake exposes bootstrap darwin-rebuild package and app" {
+  run nix eval --raw --no-write-lock-file '.#packages.aarch64-darwin.darwin-rebuild.name'
+  [ "$status" -eq 0 ]; [[ "$output" == *darwin-rebuild* ]]
+  run nix eval --raw --no-write-lock-file '.#apps.aarch64-darwin.darwin-rebuild.program'
+  [ "$status" -eq 0 ]; [[ "$output" == */bin/darwin-rebuild ]]
 }

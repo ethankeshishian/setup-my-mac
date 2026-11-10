@@ -111,6 +111,7 @@ cmd_upgrade() (
   if ! git diff --quiet -- flake.lock config/nvim/lazy-lock.json || [ -n "$casks" ]; then
     git add -- flake.lock config/nvim/lazy-lock.json && git commit --allow-empty -F "$tmp/message" || exit 1
   fi
+  smm_finalize_apply || exit 1
   complete=1
   cat "$tmp/message"
 )

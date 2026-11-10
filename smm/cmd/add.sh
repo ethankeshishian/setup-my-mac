@@ -61,7 +61,7 @@ cmd_add() (
   removed=1
   rm -rf "${HOME:?}/${target:?}" || exit 1
   smm_run_apply || exit 1
-  [ -L "${HOME:?}/${target:?}" ] && [ "$(readlink "${HOME:?}/${target:?}")" = "$dest" ] || { warn 'apply did not create the expected link'; exit 1; }
+  smm_linked_to "${HOME:?}/${target:?}" "$dest" || { warn 'apply did not create the expected link'; exit 1; }
   complete=1
   rm -rf "$transaction"
   log "added $name (uncommitted)"

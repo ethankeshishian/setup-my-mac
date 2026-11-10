@@ -10,13 +10,17 @@ setup_tmp() {
   export XDG_CACHE_HOME="$HOME/.cache"
   export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_NOSYSTEM=1
   unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+  unset SMM_TX SMM_REPO SMM_BACKUP SMM_HOST SMM_YES SMM_SKIP_AEROSPACE
+  unset SMM_APPLY_CMD SMM_VALIDATE_CMD SMM_SETUP_ORIGINAL_PATH
   mkdir -p "$HOME" "$SMM_STATE" "$TMP/bin"
   export PATH="$TMP/bin:$PATH"
   : > "$TMP/calls.log"
   local tool
-  for tool in aerospace sketchybar brew darwin-rebuild sudo op gh launchctl osascript scutil systemextensionsctl karabiner_cli ghostty nvim open defaults killall kitten curl; do
+  for tool in nix aerospace sketchybar brew darwin-rebuild sudo op gh launchctl osascript scutil systemextensionsctl karabiner_cli ghostty nvim open defaults killall kitten curl; do
     stub "$tool" 127
   done
+  stub pgrep 0
+  stub sysctl 0 '{ sec = 100, usec = 0 }'
 }
 
 stub() {
@@ -59,4 +63,36 @@ make_remote_pair() {
     git -C "$TMP/$clone" config --local user.name 'Smm Test'
     git -C "$TMP/$clone" config --local user.email smm-test@example.invalid
   done
+}
+
+# Run a child with a controlling terminal while its stdin can still be a pipe.
+run_tty() {
+  python3 - "$@" <<'PY'
+import errno, fcntl, os, pty, select, subprocess, sys, termios, time
+master, slave = pty.openpty()
+def terminal():
+    os.setsid()
+    fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
+p = subprocess.Popen(sys.argv[1:], stdin=subprocess.DEVNULL, stdout=slave, stderr=slave,
+                     preexec_fn=terminal, close_fds=True)
+os.close(slave)
+end = time.monotonic() + 15
+try:
+    while time.monotonic() < end:
+        if select.select([master], [], [], .1)[0]:
+            try:
+                data = os.read(master, 65536)
+            except OSError as e:
+                if e.errno == errno.EIO: break
+                raise
+            if not data: break
+            sys.stdout.buffer.write(data); sys.stdout.buffer.flush()
+            if any(prompt in data for prompt in (b'TTY prompt', b'Host name [', b'Commit message:')):
+                os.write(master, (os.environ.get('SMM_TEST_TTY_INPUT', 'yes') + '\n').encode())
+        elif p.poll() is not None: break
+    sys.exit(p.wait(timeout=1))
+finally:
+    if p.poll() is None: p.kill(); p.wait()
+    os.close(master)
+PY
 }

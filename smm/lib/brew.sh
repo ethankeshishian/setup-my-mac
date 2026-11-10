@@ -8,6 +8,7 @@ smm_brewfile() {
   printf '%s/Brewfile\n' "$state"
 }
 smm_brew_undeclared() {
+  command -v brew >/dev/null 2>&1 || return 0
   local file output parsed status=0
   file=$(smm_brewfile) || return 1
   # Recent bundle versions prompt on a TTY. Closed stdin guarantees a dry run.
@@ -45,7 +46,7 @@ smm_brew_add() {
     return 1
   fi
 }
-smm_brew_interactive() { [ "${SMM_YES:-0}" != 1 ] && [ -t 0 ]; }
+smm_brew_interactive() { [ "${SMM_YES:-0}" != 1 ] && smm_has_tty; }
 smm_brew_resolve() {
   local packages kind name answer
   packages=$(smm_brew_undeclared) || return 1

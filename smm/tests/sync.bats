@@ -42,6 +42,11 @@ SCRIPT
   chmod +x "$TMP/bin/git"
   for file in "$REPO"/smm/lib/*.sh "$REPO"/smm/cmd/*.sh; do source "$file"; done
   stub gh 0
+  stub scutil 0 Test-Mac
+  stub darwin-rebuild 0 '42 date (current)'
+  sed -i '' '/exit 0/i\
+if [ "$1" = build ]; then mkdir -p result/sw/bin; fi\
+' "$TMP/bin/darwin-rebuild"
   stub gitleaks 0
   mkdir -p "$SMM_REPO/manifest"
   printf '[]\n' > "$SMM_REPO/manifest/secrets.json"
@@ -57,7 +62,8 @@ fixture_commit() {
 publish_fixture() { git --git-dir="$TMP/remote.git" fetch -q "$1" HEAD:refs/heads/main; }
 @test "prompts for message when there are changes" {
   printf changed > "$SMM_REPO/config.txt"
-  run cmd_sync <<< 'My config'
+  export SMM_TEST_TTY_INPUT='My config'
+  run run_tty /bin/bash "$REPO/smm/bin/smm" sync
   [ "$status" -eq 0 ]
   [[ "$output" == *'Commit message:'* ]]
   [ "$(git -C "$SMM_REPO" log -1 --format=%s)" = 'My config' ]
@@ -162,4 +168,56 @@ PY
   [ "$status" -ne 0 ]
   [ ! -e "$SMM_STATE/sync-wt" ]
   ! git -C "$SMM_REPO" worktree list --porcelain | grep -q '/sync-wt$'
+}
+@test "review 4 candidate build failure never reaches live tree" {
+  printf incoming > "$TMP/b/config.txt"
+  fixture_commit "$TMP/b" incoming; publish_fixture "$TMP/b"
+  before=$(git -C "$SMM_REPO" rev-parse HEAD)
+  smm_build() { echo "build $(smm_repo)" >> "$TMP/calls.log"; return 1; }
+  run cmd_sync
+  [ "$status" -eq 1 ]; [ "$(git -C "$SMM_REPO" rev-parse HEAD)" = "$before" ]
+  [ ! -e "$SMM_REPO/config.txt" ]; [ ! -e "$SMM_STATE/sync-wt" ]
+  calls | grep -qx "build $SMM_STATE/sync-wt"
+}
+@test "review 4 later activation failure resets live tree preserving user's commit on backup ref" {
+  printf incoming > "$TMP/b/incoming.txt"
+  fixture_commit "$TMP/b" incoming; publish_fixture "$TMP/b"
+  printf own > "$SMM_REPO/own.txt"
+  smm_build() { :; }; smm_use_build_tools() { :; }
+  smm_run_apply() { return 1; }
+  smm_generation() { echo 42; }; smm_rollback() { echo "rollback $1" >> "$TMP/calls.log"; }
+  before=$(git -C "$SMM_REPO" rev-parse HEAD)
+  run cmd_sync -m mine
+  [ "$status" -eq 1 ]; [ "$(git -C "$SMM_REPO" rev-parse HEAD)" = "$before" ]
+  [ ! -e "$SMM_REPO/incoming.txt" ]
+  [ "$(git -C "$SMM_REPO" show refs/smm/pre-sync:own.txt)" = own ]
+  calls | grep -qx 'rollback 42'
+  ! calls | grep -q 'git push'
+}
+@test "review 4 incoming validation uses candidate system executables" {
+  printf incoming > "$TMP/b/config.txt"
+  fixture_commit "$TMP/b" incoming; publish_fixture "$TMP/b"
+  smm_build() {
+    mkdir -p "$TMP/candidate/sw/bin"
+    printf '#!/usr/bin/env bash\nprintf candidate > "$TMP/version-used"\n' > "$TMP/candidate/sw/bin/ghostty"
+    chmod +x "$TMP/candidate/sw/bin/ghostty"
+    echo "$TMP/candidate" > "$SMM_STATE/last-build"
+  }
+  smm_run_validate() {
+    [ "${2:-}" != aerospace ] || return 0
+    validate_ghostty "$1/config"
+  }
+  run cmd_sync
+  [ "$status" -eq 0 ]; [ "$(cat "$TMP/version-used")" = candidate ]
+  [ "$(cat "$SMM_REPO/config.txt")" = incoming ]
+}
+@test "review 4 candidate failure preserves the user's committed live edits" {
+  printf incoming > "$TMP/b/incoming.txt"
+  fixture_commit "$TMP/b" incoming; publish_fixture "$TMP/b"
+  printf own > "$SMM_REPO/own.txt"
+  smm_build() { return 1; }
+  run cmd_sync -m mine
+  [ "$status" -eq 1 ]; [ "$(cat "$SMM_REPO/own.txt")" = own ]
+  [ "$(git -C "$SMM_REPO" log -1 --format=%s)" = mine ]
+  [ ! -e "$SMM_REPO/incoming.txt" ]
 }

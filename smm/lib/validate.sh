@@ -14,7 +14,8 @@ smm_validate() {
     [ "$selected" -eq 1 ] || continue
     if declare -F "validate_$validator" >/dev/null; then
       if result=$("validate_$validator" "$root/$source" 2>&1); then
-        printf 'ok %s\n' "$name"
+        if [[ "$result" == skipped* ]]; then printf '%s: %s\n' "$name" "$result";
+        else printf 'ok %s\n' "$name"; fi
         continue
       fi
     else
@@ -30,6 +31,12 @@ smm_validate() {
 
 # A subshell keeps traps and temporary state out of the caller.
 validate_aerospace() (
+  if [ "${SMM_SKIP_AEROSPACE:-0}" = 1 ]; then
+    echo 'skipped (checked with running server before and after activation)'; exit 0
+  fi
+  if ! pgrep -x AeroSpace >/dev/null; then
+    echo 'skipped (aerospace not running)'; exit 0
+  fi
   file=$1 live="$HOME/.aerospace.toml" state='' swap='' child=''
   if [ "$live" -ef "$file" ]; then
     aerospace reload-config --dry-run --no-gui

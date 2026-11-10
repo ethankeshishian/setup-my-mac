@@ -138,3 +138,26 @@ SCRIPT
   [ "$status" -ne 0 ]
   [ "$(cat "$TMP/escaped-config/example")" = content ]
 }
+@test "review 12 add accepts indirect home-manager links" {
+  python3 - "$TMP/apply" <<'PY'
+import sys
+p=sys.argv[1]
+s=open(p).read().replace('ln -s "$SMM_REPO/$source" "$HOME/$target"', 'ln -sf "$SMM_REPO/$source" "$TMP/store-link"\n  ln -s "$TMP/store-link" "$HOME/$target"')
+open(p,'w').write(s)
+PY
+  printf content > "$HOME/.config/example"
+  run cmd_add "$HOME/.config/example"
+  [ "$status" -eq 0 ]; [ -L "$HOME/.config/example" ]
+}
+@test "review 12 remove accepts indirect home-manager links" {
+  printf content > "$HOME/.config/example"
+  cmd_add "$HOME/.config/example"
+  rm "$HOME/.config/example"
+  ln -s "$SMM_REPO/config/example" "$TMP/store-link"
+  ln -s "$TMP/store-link" "$HOME/.config/example"
+  choose() { echo 'keep file'; }
+  smm_run_apply() { :; }
+  run cmd_remove example
+  [ "$status" -eq 0 ]; [ ! -L "$HOME/.config/example" ]
+  [ "$(cat "$HOME/.config/example")" = content ]
+}

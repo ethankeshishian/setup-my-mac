@@ -12,21 +12,21 @@ die() { warn "$1"; exit "${2:-1}"; }
 confirm() {
   local answer
   [ "${SMM_YES:-0}" = 1 ] && return 0
-  [ -t 0 ] || return 1
+  smm_has_tty || return 1
   printf '%s [y/N] ' "$1" >&2
-  IFS= read -r answer || return 1
+  IFS= read -r answer </dev/tty || return 1
   case "$answer" in y|Y|yes|YES) return 0 ;; *) return 1 ;; esac
 }
 choose() {
   local question=$1 option answer index=0
   shift
-  [ -t 0 ] || return 1
+  smm_has_tty || return 1
   printf '%s\n' "$question" >&2
   for option in "$@"; do
     index=$((index + 1))
     printf '%s) %s\n' "$index" "$option" >&2
   done
-  IFS= read -r answer || return 1
+  IFS= read -r answer </dev/tty || return 1
   case "$answer" in ''|*[!0-9]*) return 1 ;; esac
   [ "$answer" -gt 0 ] && [ "$answer" -le "$#" ] || return 1
   index=0
@@ -78,4 +78,10 @@ smm_config_source_safe() {
   parent=$(cd "$parent" && pwd -P) || return 1
   case "$parent/" in "$repo/"*) ;; *) return 1 ;; esac
   [ ! -L "$repo/$source" ]
+}
+
+smm_has_tty() { ( : </dev/tty ) 2>/dev/null; }
+# Home Manager may link through several store symlinks.
+smm_linked_to() {
+  [ -L "$1" ] && [ "$(readlink -f "$1")" = "$(readlink -f "$2")" ]
 }
