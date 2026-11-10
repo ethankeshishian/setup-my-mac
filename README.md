@@ -34,19 +34,16 @@ your clicks; setup opens the settings panes. Any restart is offered once at the 
 
 ## Existing Mac
 
-After the first Nix build puts `smm` on PATH:
+A Mac set up with the old script (no Nix yet) runs smm straight from the repo:
 
 ```bash
 cd ~/Repos/setup-my-mac
-smm setup --preview
-smm setup
+git pull
+smm/bin/smm setup --preview   # shows every difference, changes nothing
+smm/bin/smm setup
 ```
 
-Before that first build, use `nix run .#smm -- setup --preview`, then
-`nix run .#smm -- setup`. Migrate `Ethans-MacBook-Pro` first. On the second Mac,
-review each differing config, including nvim and its plugin lockfile, so local
-tweaks are preserved. Undeclared Homebrew packages are offered for adoption or
-explicit removal. The old `setup-my-mac.sh` is retired.
+Setup installs Nix itself. After it finishes, `smm` is on PATH.
 
 ## Commands
 
