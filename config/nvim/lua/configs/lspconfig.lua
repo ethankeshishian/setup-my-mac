@@ -2,7 +2,7 @@ require("nvchad.configs.lspconfig").defaults()
 
 local nvlsp = require "nvchad.configs.lspconfig"
 
--- EXAMPLE
+-- Server commands resolve from PATH; Mason is disabled in plugins/init.lua.
 local servers = { "html", "cssls" }
 
 -- lsps with default config (using Neovim 0.11 API)

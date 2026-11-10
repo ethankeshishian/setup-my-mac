@@ -67,11 +67,16 @@ setup() {
     "aerospace", "sketchybar", "jankyborders", "ghostty-bin", "neovim", "tmux",
     "ripgrep", "fd", "fzf", "zoxide", "thefuck", "vivid", "git", "git-town", "gh",
     "jq", "gitleaks", "python3", "lua-language-server", "typescript-language-server",
-    "vscode-langservers-extracted", "stylua"
+    "vscode-langservers-extracted", "stylua", "haskellPackages.static-ls"
   ]' "$REPO/manifest/nix-packages.json"
 }
 
 @test "secrets manifest declares only the weather reference" {
   jq -e '. == [{"name":"weather", "op_ref":"op://smm/sketchybar-weather/env",
     "target":".config/sketchybar/scripts/weather.env.sh"}]' "$REPO/manifest/secrets.json"
+}
+
+@test "nvim links the imported config and tracks the supplied starter ancestor" {
+  jq -e '.[] | select(.name == "nvim") | . == {name:"nvim",source:"config/nvim",target:".config/nvim",type:"dir",validator:"nvim",reload:null}' "$LINKS"
+  jq -e '. == {upstream:"https://github.com/NvChad/starter",branch:"main",merged:"e3572e1f5e1c297212c3deeb17b7863139ce663e"}' "$REPO/manifest/nvchad-starter.json"
 }

@@ -20,3 +20,9 @@ PY
   run rg '^theme = catppuccin-mocha$' "$REPO/config/ghostty/config"
   [ "$status" -eq 0 ]
 }
+@test "nvim disables Mason PATH changes and declares its Haskell server" {
+  rg '"williamboman/mason.nvim"' "$REPO/config/nvim/lua/plugins/init.lua"
+  rg 'PATH = "skip"' "$REPO/config/nvim/lua/plugins/init.lua"
+  rg 'ensure_installed = \{\}' "$REPO/config/nvim/lua/plugins/init.lua"
+  jq -e 'index("haskellPackages.static-ls") != null' "$REPO/manifest/nix-packages.json"
+}

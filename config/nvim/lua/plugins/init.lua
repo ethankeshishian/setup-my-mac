@@ -1,4 +1,11 @@
 return {
+  -- Nix supplies servers and formatters. Keep Mason from changing PATH or installing tools.
+  {
+    "williamboman/mason.nvim",
+    enabled = false,
+    opts = { PATH = "skip", ensure_installed = {} },
+  },
+
   {
     "stevearc/conform.nvim",
     event = "BufWritePre", -- uncomment for format on save
