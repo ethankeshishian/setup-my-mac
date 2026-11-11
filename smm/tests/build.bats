@@ -68,6 +68,14 @@ setup() {
   [ "$status" -ne 0 ]
   [ "$(cat "$SMM_STATE/applied.hash")" = old ]
 }
+@test "generation comes from the system profile link without listing generations" {
+  mkdir -p "$TMP/profiles"
+  ln -s /nix/store/x-darwin-system "$TMP/profiles/system-7-link"
+  ln -s system-7-link "$TMP/profiles/system"
+  stub darwin-rebuild 1 'error: opening lock file: Permission denied'
+  [ "$(smm_generation)" = 7 ]
+  ! calls | grep -q 'darwin-rebuild --list-generations' || return 1
+}
 @test "missing current generation means initial activation" {
   stub darwin-rebuild 0 '41 date'
   run smm_generation

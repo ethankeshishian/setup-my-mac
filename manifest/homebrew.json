@@ -1,6 +1,7 @@
 {
   "taps": [],
   "brews": [
+    "direnv",
     "tpm"
   ],
   "casks": [

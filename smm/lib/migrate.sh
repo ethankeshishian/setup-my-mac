@@ -62,7 +62,12 @@ smm_brew_duplicates() {
       while IFS= read -r candidate; do
         alias=${candidate##*.}
         case "$candidate" in jankyborders) alias=borders ;; ghostty-bin) alias=ghostty@tip ;; esac
-        if [ "$short" = "$alias" ] || [ "$short" = "$candidate" ]; then printf '%s %s\n' "$kind" "$name"; break; fi
+        if [ "$short" = "$alias" ] || [ "$short" = "$candidate" ]; then
+          # Homebrew refuses to remove a formula another installed formula needs
+          # (e.g. ripgrep for opencode-v2); keep it alongside the Nix package.
+          if [ "$kind" = brew ] && [ -n "$(brew uses --installed "$name" 2>/dev/null)" ]; then break; fi
+          printf '%s %s\n' "$kind" "$name"; break
+        fi
       done <<< "$packages"
     done <<< "$installed"
   done

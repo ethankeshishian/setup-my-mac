@@ -61,10 +61,20 @@ smm_rebuild_sudo() {
 }
 
 smm_generation() {
-  local generations
+  local generations profile=${SMM_SYSTEM_PROFILE:-/nix/var/nix/profiles/system} link
+  # The profile link needs no lock; non-root --list-generations can fail with
+  # "opening lock file .../system.lock: Permission denied" after first activation.
+  if [ -L "$profile" ]; then
+    link=$(readlink "$profile") || return 1
+    case "$link" in
+      system-*-link)
+        link=${link#system-}; link=${link%-link}
+        case "$link" in ''|*[!0-9]*) ;; *) printf '%s\n' "$link"; return 0 ;; esac ;;
+    esac
+  fi
   if ! generations=$(smm_rebuild --list-generations); then
     # A fresh Mac has no system profile yet.
-    [ ! -e /nix/var/nix/profiles/system ] && return 0
+    [ ! -e "$profile" ] && return 0
     return 1
   fi
   awk '/\(current\)/ && $1 ~ /^[0-9]+$/ { print $1; exit }' <<< "$generations"

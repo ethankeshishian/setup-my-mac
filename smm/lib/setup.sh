@@ -340,15 +340,22 @@ step_dedupe_done() {
 # Cask token -> the app name macOS knows it by.
 smm_cask_app() { case "$1" in alt-tab) echo AltTab ;; aerospace) echo AeroSpace ;; *) echo "$1" ;; esac; }
 step_dedupe_run() {
-  local duplicates kind name file
+  local duplicates kind name file services
   duplicates=$(smm_brew_duplicates) || return 1
   file="$(smm_state_dir)/deduped"
+  services="$(smm_state_dir)/deduped-services"
   while IFS=' ' read -r kind name; do
     [ -n "$name" ] || continue
     # Journal before stopping anything so interruption is recoverable.
     if [ ! -f "$file" ] || ! grep -Fxq "$kind $name" "$file"; then printf '%s %s\n' "$kind" "$name" >> "$file"; fi
     case "$kind" in
-      brew) brew services stop "$name" || :; HOMEBREW_NO_AUTOREMOVE=1 brew uninstall "$name" || return 1 ;;
+      brew)
+        # Recovery restarts only services that were running before.
+        if brew services list 2>/dev/null | awk -v name="$name" '$1 == name && $2 == "started" { found=1 } END { exit !found }' &&
+          ! grep -Fxqs "$name" "$services"; then
+          printf '%s\n' "$name" >> "$services"
+        fi
+        brew services stop "$name" || :; HOMEBREW_NO_AUTOREMOVE=1 brew uninstall "$name" || return 1 ;;
       cask)
         osascript -e 'on run argv' -e 'tell application (item 1 of argv) to quit' -e 'end run' "$(smm_cask_app "$name")" || :
         HOMEBREW_NO_AUTOREMOVE=1 brew uninstall --cask "$name" || return 1 ;;
@@ -357,18 +364,23 @@ step_dedupe_run() {
   done <<< "$duplicates"
 }
 smm_setup_restore_brew() {
-  local file kind name failed=0
+  local file services kind name failed=0
   file="$(smm_state_dir)/deduped"
+  services="$(smm_state_dir)/deduped-services"
   [ -s "$file" ] || return 0
   while IFS=' ' read -r kind name; do
     case "$kind" in
-      brew) brew install "$name" && brew services start "$name" || failed=1 ;;
+      brew)
+        # These were installed before setup removed them. Homebrew now refuses
+        # untrusted third-party taps (e.g. felixkratz/formulae/borders) by default.
+        HOMEBREW_NO_REQUIRE_TAP_TRUST=1 brew install "$name" || { failed=1; continue; }
+        if grep -Fxqs "$name" "$services"; then brew services start "$name" || failed=1; fi ;;
       cask)
         brew install --cask "$name" && open -a "$(smm_cask_app "$name")" || failed=1 ;;
       *) failed=1 ;;
     esac
   done < "$file"
-  [ "$failed" -ne 0 ] || : > "$file"
+  [ "$failed" -ne 0 ] || { : > "$file"; rm -f "$services"; }
   return "$failed"
 }
 smm_setup_recover() {
@@ -414,12 +426,31 @@ step_switch_run() {
     smm_tx_arm "$state/applied.hash" && smm_tx_clear_targets || return 1
   fi
   if ! smm_switch; then smm_setup_recover || warn 'recovery incomplete'; return 1; fi
+  smm_restart_nix_agents
   smm_validate_prefs "$(smm_repo)" || return 1
-  smm_prefs_relaunch || return 1
+  # The system is already active; an app refusing to quit (Raycast answers
+  # AppleScript quit with -128) is no reason to roll it back. The prefs hash
+  # isn't advanced, so the next apply relaunches it again.
+  smm_prefs_relaunch || warn 'an app did not restart; quit and reopen it to apply its preferences'
   smm_run_validate "$(smm_repo)" aerospace || return 1
   smm_need_restart 'macOS menu bar and symbolic hotkey defaults' || return 1
 }
 
+# AeroSpace, not brew services, used to start Homebrew's SketchyBar and borders,
+# so they keep running after dedupe removes them. Each allows one instance, so
+# the Nix launchd agents exit and health would query the old bar and config.
+smm_restart_nix_agents() {
+  local pair name label pid path
+  for pair in sketchybar:org.nixos.sketchybar borders:org.nixos.jankyborders; do
+    name=${pair%%:*}; label=${pair#*:}
+    launchctl print "gui/$UID/$label" >/dev/null 2>&1 || continue
+    for pid in $(pgrep -x "$name"); do
+      path=$(ps -o comm= -p "$pid") || continue
+      case "$path" in /nix/store/*) ;; *) kill "$pid" 2>/dev/null || : ;; esac
+    done
+    launchctl kickstart -k "gui/$UID/$label" >/dev/null 2>&1 || warn "could not start $label"
+  done
+}
 step_permissions_done() {
   smm_permission_granted aerospace && smm_permission_granted karabiner || return 1
   ! smm_app_bundle alttab >/dev/null

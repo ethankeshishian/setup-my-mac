@@ -15,6 +15,8 @@ setup_tmp() {
   export SMM_ETC_ROOT="$TMP/etc"
   mkdir -p "$SMM_ETC_ROOT"
   export SMM_WAIT_SECONDS=0
+  # Never read the real machine's nix-darwin generation.
+  export SMM_SYSTEM_PROFILE="$TMP/profiles/system"
   unset SMM_TX SMM_REPO SMM_BACKUP SMM_HOST SMM_YES SMM_SKIP_AEROSPACE
   unset SMM_APPLY_CMD SMM_VALIDATE_CMD SMM_SETUP_ORIGINAL_PATH
   export SMM_APPLICATIONS_DIR="$TMP/Applications"

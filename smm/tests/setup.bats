@@ -45,6 +45,7 @@ fixture_steps() {
 }
 @test "switch failure reinstalls deduped brew packages" {
   printf 'brew sketchybar\ncask aerospace\n' > "$SMM_STATE/deduped"
+  echo sketchybar > "$SMM_STATE/deduped-services"
   smm_generation() { echo 42; }; smm_run_validate() { return 0; }
   smm_switch() { return 1; }; smm_rollback() { echo rollback >> "$TMP/calls.log"; }
   run step_switch_run; [ "$status" -eq 1 ]
@@ -270,4 +271,61 @@ esac\
   run cmd_setup
   [ "$status" -ne 0 ]
   ! calls | grep -qx built
+}
+@test "duplicates keep a formula another installed formula depends on" {
+  echo '["ripgrep","fd"]' > "$SMM_REPO/manifest/nix-packages.json"
+  stub brew 0
+  sed_inplace '/exit 0/i\
+case "$*" in\
+  "list --formula") printf "ripgrep\\nfd\\n" ;;\
+  "uses --installed ripgrep") echo opencode-v2 ;;\
+esac\
+' "$TMP/bin/brew"
+  run smm_brew_duplicates; [ "$status" -eq 0 ]
+  [ "$output" = 'brew fd' ]
+}
+@test "dedupe records running services and recovery restarts only those, trusting prior taps" {
+  echo '["sketchybar","fd"]' > "$SMM_REPO/manifest/nix-packages.json"
+  smm_brew_duplicates() { printf 'brew sketchybar\nbrew fd\n'; }
+  stub brew 0
+  sed_inplace '/exit 0/i\
+case "$*" in\
+  "services list") printf "Name Status User File\\nsketchybar started me x\\nfd none\\n" ;;\
+  "install "*) [ "${HOMEBREW_NO_REQUIRE_TAP_TRUST:-}" = 1 ] || exit 97 ;;\
+  "services start fd") exit 1 ;;\
+esac\
+' "$TMP/bin/brew"
+  run step_dedupe_run; [ "$status" -eq 0 ]
+  [ "$(cat "$SMM_STATE/deduped-services")" = sketchybar ]
+  run smm_setup_restore_brew; [ "$status" -eq 0 ]
+  calls | grep -qx 'brew install sketchybar'; calls | grep -qx 'brew install fd'
+  calls | grep -qx 'brew services start sketchybar'
+  ! calls | grep -qx 'brew services start fd' || return 1
+  [ ! -s "$SMM_STATE/deduped" ]; [ ! -e "$SMM_STATE/deduped-services" ]
+}
+@test "switch keeps the activated system when an app refuses to restart" {
+  smm_use_build_tools() { :; }; smm_run_validate() { return 0; }
+  smm_switch() { :; }; smm_validate_prefs() { :; }
+  smm_prefs_relaunch() { echo 'execution error: Raycast got an error: User canceled. (-128)' >&2; return 1; }
+  smm_setup_recover() { echo recover >> "$TMP/calls.log"; }
+  run step_switch_run; [ "$status" -eq 0 ]
+  [[ "$output" == *'quit and reopen it'* ]] || return 1
+  ! calls | grep -qx recover || return 1
+}
+@test "after switching, stale non-Nix sketchybar and borders are replaced by the Nix agents" {
+  stub launchctl 0
+  stub pgrep 0
+  sed_inplace '/exit 0/i\
+case "$*" in "-x sketchybar") echo 101 ;; "-x borders") printf "202\\n303\\n" ;; esac\
+' "$TMP/bin/pgrep"
+  stub ps 0
+  sed_inplace '/exit 0/i\
+case "$*" in *101*) echo sketchybar ;; *202*) echo /opt/homebrew/bin/borders ;; *303*) echo /nix/store/x-jankyborders/bin/borders ;; esac\
+' "$TMP/bin/ps"
+  kill() { echo "kill $*" >> "$TMP/calls.log"; }
+  smm_restart_nix_agents
+  calls | grep -qx 'kill 101'; calls | grep -qx 'kill 202'
+  ! calls | grep -qx 'kill 303' || return 1
+  calls | grep -q "launchctl kickstart -k gui/$UID/org.nixos.sketchybar"
+  calls | grep -q "launchctl kickstart -k gui/$UID/org.nixos.jankyborders"
 }

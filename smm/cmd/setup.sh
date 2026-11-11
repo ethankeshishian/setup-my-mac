@@ -64,5 +64,6 @@ cmd_setup() (
   if [ -f "$state/setup-generation" ]; then smm_finalize_apply || exit 1; fi
   rm -f "$state/setup-generation"
   : > "$state/deduped"
+  rm -f "$state/deduped-services"
   complete=1
 )

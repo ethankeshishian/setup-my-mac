@@ -65,7 +65,7 @@ setup() {
 
 @test "homebrew manifest contains the approved packages sorted without duplicates" {
   jq -e '
-    .taps == [] and .brews == ["tpm"] and
+    .taps == [] and .brews == ["direnv", "tpm"] and
     .casks == (.casks | unique | sort) and .casks == ([
       "spotify", "arc", "todoist", "obsidian", "clay", "notion-calendar",
       "raindropio", "visual-studio-code", "mos", "mac-mouse-fix@2",
