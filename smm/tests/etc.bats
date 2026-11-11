@@ -75,9 +75,10 @@ TEXT
 @test "etc eval projects enabled metadata and uses experimental-feature helper" {
   unset -f smm_etc_entries
   source "$REPO/smm/lib/etc.sh"
+  git -C "$SMM_REPO" init -q
   stub nix 0 '{}'
   run smm_etc_entries; [ "$status" -eq 0 ]; [ "$output" = '{}' ]
-  calls | grep -Fq 'nix --extra-experimental-features nix-command flakes eval --json path:'
+  calls | grep -Fq "nix --extra-experimental-features nix-command flakes eval --no-write-lock-file --json path:$SMM_STATE/flake."
   calls | grep -Fq 'knownSha256Hashes enable'
 }
 @test "unknown target with shell code refuses takeover and etc file change requires new review" {
@@ -125,7 +126,7 @@ TEXT
   jq -e '.shell == "" and .variables == {BEFORE:"yes",AFTER:"yes"}' <<< "$output"
 }
 @test "macOS stock shell fixtures are dropped and user additions are preserved" {
-  for shell in bashrc zshrc; do
+  for shell in bashrc zshrc zprofile; do
     cat "$REPO/smm/tests/fixtures/etc/$shell" > "$SMM_ETC_ROOT/$shell"
     echo 'echo custom-work-init' >> "$SMM_ETC_ROOT/$shell"
     run smm_etc_classify "$SMM_ETC_ROOT/$shell" "$shell"
@@ -134,13 +135,14 @@ TEXT
   done
 }
 @test "etc review CLI shows accepted known and pending managed files read-only" {
+  git -C "$SMM_REPO" init -q
   echo '# stock comment' > "$SMM_ETC_ROOT/zshenv"
   echo 'export WORK=keep' >> "$SMM_ETC_ROOT/zshenv"
   stub nix 0 '{"zshenv":{"enable":true,"target":"zshenv","knownSha256Hashes":[]}}'
   before=$(shasum "$SMM_ETC_ROOT/zshenv")
   run "$REPO/smm/bin/smm" etc review
   [ "$status" -eq 0 ]
-  [[ "$output" == *DROP*KEEP*WORK=keep* ]] || return 1
+  [[ "$output" == *'zshenv: pending (decision needed)'*DROP*KEEP*WORK=keep* ]] || return 1
   [ "$before" = "$(shasum "$SMM_ETC_ROOT/zshenv")" ]
   ! calls | grep -Eq 'sudo|build|switch'
   [ ! -d "$SMM_REPO/hosts/etc" ]
@@ -162,4 +164,56 @@ TEXT
   run smm_etc_classify "$SMM_ETC_ROOT/zshrc" zshrc
   [ "$status" -eq 0 ]
   jq -e --rawfile original "$SMM_ETC_ROOT/zshrc" '.shell == $original and .variables == {} and all(.review[]; .action == "KEEP")' <<< "$output"
+}
+@test "etc review evaluates a snapshot without ignored files and never writes a lock" {
+  git -C "$SMM_REPO" init -q
+  echo 'secret.env' > "$SMM_REPO/.gitignore"
+  echo 'TOKEN=hunter2' > "$SMM_REPO/secret.env"
+  echo '{ }' > "$SMM_REPO/flake.nix"
+  git -C "$SMM_REPO" add .gitignore flake.nix
+  before=$(git -C "$SMM_REPO" status --porcelain --ignored)
+  cat > "$TMP/bin/nix" <<'STUB'
+#!/usr/bin/env bash
+printf 'nix %s\n' "$*" >> "$TMP/calls.log"
+for arg; do case "$arg" in path:*) src=${arg#path:}; src=${src%%#*}; find "$src" -type f >> "$TMP/source.txt" ;; esac; done
+echo '{"zshenv":{"enable":true,"target":"zshenv","knownSha256Hashes":[]}}'
+STUB
+  chmod +x "$TMP/bin/nix"
+  echo 'export WORK=keep' > "$SMM_ETC_ROOT/zshenv"
+  unset -f smm_etc_entries
+  run "$REPO/smm/bin/smm" etc review
+  [ "$status" -eq 0 ]
+  calls | grep -q -- '--no-write-lock-file'
+  ! calls | grep -qF "path:$SMM_REPO#"
+  grep -q '/flake.nix$' "$TMP/source.txt"
+  ! grep -q 'secret.env' "$TMP/source.txt"
+  [ "$before" = "$(git -C "$SMM_REPO" status --porcelain --ignored)" ]
+  [ ! -e "$SMM_REPO/flake.lock" ]
+}
+@test "etc review labels stock-hash and accepted files instead of implying they are kept" {
+  git -C "$SMM_REPO" init -q
+  cat "$REPO/smm/tests/fixtures/etc/zprofile" > "$SMM_ETC_ROOT/zprofile"
+  echo 'export WORK=keep' > "$SMM_ETC_ROOT/zshenv"
+  stock=$(shasum -a 256 "$SMM_ETC_ROOT/zprofile" | awk '{print $1}')
+  smm_etc_entries() { printf '{"zprofile":{"enable":true,"target":"zprofile","knownSha256Hashes":["%s"]},"zshenv":{"enable":true,"target":"zshenv","knownSha256Hashes":[]}}\n' "$stock"; }
+  step_build_run() { :; }
+  step_etc_run
+  run smm_etc_review
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'zprofile: known stock hash: replaced entirely by nix-darwin'* ]] || return 1
+  ! [[ "$output" == *path_helper* ]]
+  [[ "$output" == *'zshenv: already accepted in hosts/etc/Test-Mac.nix'*KEEP*WORK=keep* ]] || return 1
+}
+@test "etc paths are appended after Nix paths in path_helper order in bash and zsh" {
+  mkdir -p "$TMP/root/paths.d"
+  printf '/usr/bin\n/System/Cryptexes/App/usr/bin\n' > "$TMP/root/paths"
+  printf '/opt/X11/bin\n' > "$TMP/root/paths.d/40-XQuartz"
+  printf '# note\n\n/pkg/env/global/bin' > "$TMP/root/paths.d/10-pmk-global"
+  # A deleted working directory from an earlier test makes the shell warn.
+  cd "$TMP"
+  for shell in /bin/bash /bin/zsh; do
+    run env -i PATH=/nix/bin:/usr/bin __smm_etc_root="$TMP/root" "$shell" -c ". '$REPO/modules/darwin/etc-paths.sh'; echo \"\$PATH\"; typeset -f __smm_etc_paths >/dev/null && echo LEAK; :"
+    [ "$status" -eq 0 ]
+    [ "$output" = /nix/bin:/usr/bin:/System/Cryptexes/App/usr/bin:/pkg/env/global/bin:/opt/X11/bin ] || { echo "shell=$shell output=[$output]"; return 1; }
+  done
 }

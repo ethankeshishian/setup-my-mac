@@ -38,7 +38,8 @@ Paste this to the agent on the Mac being migrated:
 > accepted changes to `hosts/etc/<host>.nix`, and rebuilds before activation.
 > Accepted entries produce no `etc.*` question; `--plan` lists them as already
 > accepted. Run the read-only `smm/bin/smm etc review` to see the classifier
-> keep/drop output for every managed file, including accepted entries. Relay
+> keep/drop output. Each file is labeled pending, already accepted, or known
+> stock (replaced entirely by nix-darwin, so nothing in it is kept). Relay
 > that complete review to Ethan before setting `etc.<name>` to `accept`. Uncertain
 > macOS stock lines are conservatively kept. Never run sudo yourself, never answer
 > a password dialog, and never handle Ethan's password. Setup requests it through

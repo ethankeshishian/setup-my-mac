@@ -6,11 +6,13 @@ smm_etc_entries() {
   state=$(smm_state_dir) || return 1
   if [ "${SMM_PLAN:-0}" != 1 ] && [ -f "$state/last-build-flake" ]; then
     ref=$(cat "$state/last-build-flake") || return 1
-  elif [ "${SMM_AGENT_SETUP:-0}" = 1 ]; then ref=$(smm_flake_ref) || return 1;
-  else ref="path:$repo"; fi
-  # path: includes generated/untracked host modules without staging the checkout.
+  else
+    # The snapshot includes generated/untracked host modules but never ignored
+    # files. A path: flake of the checkout would copy secrets into the store.
+    ref=$(SMM_AGENT_SETUP=1 smm_flake_ref) || return 1
+  fi
   # shellcheck disable=SC2016 # Nix lambda, not shell interpolation.
-  smm_nix eval --json "$ref#darwinConfigurations.$host.config.environment.etc" --apply '
+  smm_nix eval --no-write-lock-file --json "$ref#darwinConfigurations.$host.config.environment.etc" --apply '
     entries: builtins.mapAttrs (name: entry: {
       inherit (entry) target knownSha256Hashes enable;
     }) (builtins.removeAttrs entries (builtins.filter
@@ -130,11 +132,13 @@ smm_etc_accepted_report() {
   [ -n "$names" ] || return 0
   log "already accepted in hosts/etc/$host.nix: $names"
 }
-# Read-only classifier output includes known hashes and accepted files too.
+# Read-only: says per file whether a decision is pending, already accepted, or
+# moot because nix-darwin replaces the whole file.
 smm_etc_review() (
   tmp=$(mktemp -d) || exit 1
   trap 'rm -rf "$tmp"' EXIT
   export SMM_STATE="$tmp/state" SMM_PLAN=1 SMM_AGENT_SETUP=0
+  generated="$(smm_repo)/hosts/etc/$(smm_host).nix" || exit 1
   entries=$(smm_etc_entries) || exit 1
   jq -e 'type == "object"' <<< "$entries" >/dev/null || exit 1
   names=$(jq -r 'keys[]' <<< "$entries") || exit 1
@@ -146,8 +150,23 @@ smm_etc_review() (
     smm_safe_relative "$target" || { warn "unsafe etc target: $target"; exit 1; }
     file="${SMM_ETC_ROOT:-/etc}/$target"
     [ -f "$file" ] || continue
+    if [ -L "$file" ]; then
+      case "$(readlink -f "$file")" in
+        */static/*|/nix/store/*) log "/etc/$target: managed by nix-darwin already; nothing to review"; continue ;;
+      esac
+    fi
+    sha=$(shasum -a 256 "$file" | awk '{print $1}') || exit 1
+    if [ "$(jq -r --arg sha "$sha" '.knownSha256Hashes | index($sha)' <<< "$entry")" != null ]; then
+      log "/etc/$target: known stock hash: replaced entirely by nix-darwin; nothing in it is kept"
+      continue
+    fi
+    if [ -f "$generated" ] && grep -Fxq "    # smm-accepted $(smm_nix_string "$name") $sha" "$generated"; then
+      status="already accepted in hosts/etc/$(basename "$generated")"
+    else
+      status='pending (decision needed)'
+    fi
     classification=$(smm_etc_classify "$file" "$target") || exit 1
-    log "/etc/$target: exact keep/drop review:"
+    log "/etc/$target: $status. Exact keep/drop review:"
     jq -r '.review[] | "\(.action) [\(.reason)] \(.line)"' <<< "$classification" || exit 1
   done <<< "$names"
 )

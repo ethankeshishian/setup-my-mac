@@ -130,15 +130,18 @@ $packages"; return 0; fi
 smm_cask_versions_match() {
   local cask=$1 app=$2 expected installed metadata
   metadata=$(HOMEBREW_NO_AUTO_UPDATE=1 brew info --cask --json=v2 "$cask") || return 1
-  jq -e '.casks[0].auto_updates == true' <<< "$metadata" >/dev/null && return 0
   expected=$(jq -er '.casks[0].version | split(",")[0]' <<< "$metadata") || return 1
   installed=$(plutil -extract CFBundleShortVersionString raw -o - "${SMM_APPLICATIONS_DIR:-/Applications}/$app/Contents/Info.plist") || return 1
-  [ "$expected" = "$installed" ]
+  [ "$expected" = "$installed" ] && return 0
+  # A major version jump (e.g. 3.x to 4.x) is the user's call even when it auto-updates.
+  jq -e '.casks[0].auto_updates == true' <<< "$metadata" >/dev/null && [ "${expected%%.*}" = "${installed%%.*}" ]
 }
 
 # Inventory only names: installed versions stay untouched by --no-upgrade.
 smm_brew_missing() {
-  local kind declared installed name short
+  local kind declared installed name short unmanaged
+  # Apps installed outside Homebrew are adopted, not freshly installed.
+  unmanaged=$(smm_brew_unmanaged_casks | cut -f1) || return 1
   for kind in brew cask; do
     declared=$(jq -r --arg kind "$kind" 'if $kind == "brew" then .brews[] else .casks[] end' "$(smm_repo)/manifest/homebrew.json") || return 1
     [ -n "$declared" ] || continue
@@ -152,6 +155,7 @@ smm_brew_missing() {
     while IFS= read -r name; do
       [ -n "$name" ] || continue
       short=${name##*/}
+      [ "$kind" = brew ] || ! grep -Fxq -- "$name" <<< "$unmanaged" || continue
       if ! grep -Fxq -- "$short" <<< "$installed" && ! grep -Fxq -- "$name" <<< "$installed"; then
         printf '%s %s\n' "$kind" "$name"
       fi

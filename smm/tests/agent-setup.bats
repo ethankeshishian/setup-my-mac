@@ -241,11 +241,27 @@ esac\
 }
 @test "plan pre-fills adoption for auto-updating unmanaged casks with different versions" {
   smm_brew_unmanaged_casks() { printf 'arc\tArc.app\n'; }
-  stub brew 0 '{"casks":[{"version":"2.0","auto_updates":true}]}'
-  stub plutil 0 9.0
+  stub brew 0 '{"casks":[{"version":"2.9","auto_updates":true}]}'
+  stub plutil 0 2.1
   run cmd_setup --plan "$TMP/plan.json"
   [ "$status" -eq 0 ]
   jq -e '.questions[] | select(.key == "unmanaged.arc") | .value == "adopt" and (.allowed | index("replace") != null)' "$TMP/plan.json"
+}
+@test "plan asks about auto-updating unmanaged casks a major version apart" {
+  smm_brew_unmanaged_casks() { printf 'mos\tMos.app\n'; }
+  stub brew 0 '{"casks":[{"version":"4.2.1","auto_updates":true}]}'
+  stub plutil 0 3.4.1
+  run cmd_setup --plan "$TMP/plan.json"
+  [ "$status" -eq 0 ]
+  jq -e '.questions[] | select(.key == "unmanaged.mos") | .value == null' "$TMP/plan.json"
+}
+@test "apps installed outside Homebrew are adopted, not listed as fresh installs" {
+  stub brew 0
+  smm_brew_unmanaged_casks() { printf 'arc\tArc.app\n'; }
+  echo '{"taps":[],"brews":[],"casks":["arc","logi-options+"]}' > "$SMM_REPO/manifest/homebrew.json"
+  run smm_brew_missing
+  [ "$status" -eq 0 ]
+  [ "$output" = 'cask logi-options+' ]
 }
 @test "plan lists accepted entries after activation links etc into static" {
   echo 'export WORK=preserve' > "$SMM_ETC_ROOT/zshenv"

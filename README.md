@@ -56,7 +56,9 @@ choices, then run `smm/bin/smm setup --answers <file>`. Exit code 3 means setup
 needs an answer or a user action; `SMM-NEEDS` and `SMM-WAITING` also go to
 `~/.local/state/smm/needs.log`. See [the pasteable agent instructions](docs/agent-setup.md).
 Setup reviews conflicting `/etc` shell files and preserves approved customizations
-in `hosts/etc/<host>.nix` before rebuilding and activating.
+in `hosts/etc/<host>.nix` before rebuilding and activating. nix-darwin's shell
+init doesn't run `path_helper`, so smm appends `/etc/paths` and `/etc/paths.d`
+entries after the Nix paths instead.
 
 ## Commands
 

@@ -42,6 +42,7 @@ setup_file() {
             sketchybarConfig = c.services.sketchybar.config;
             localHostName = c.networking.localHostName;
             awsCaBundle = c.environment.variables.AWS_CA_BUNDLE or null;
+            extraInit = c.environment.extraInit;
             aerospaceEnabled = c.services.aerospace.enable;
             aerospaceService = c.launchd.user.agents.aerospace.serviceConfig;
             aerospacePath = c.launchd.user.agents.aerospace.path;
@@ -174,6 +175,12 @@ eval_raw() {
   [ "$output" = null ]
 }
 
+@test "shell init appends /etc/paths entries after Nix paths on both Macs" {
+  for HOST in Ethans-MacBook-Pro Ethans-MacBook-Pro-Mercury; do
+    eval_raw extraInit
+    [[ "$output" == *'__smm_etc_paths "${__smm_etc_root:-/etc}"'* ]] || return 1
+  done
+}
 @test "host identity is fixed" {
   for HOST in Ethans-MacBook-Pro Ethans-MacBook-Pro-Mercury; do
     eval_raw localHostName
