@@ -1,12 +1,7 @@
 # This Mac's own zsh setup. Shared settings live in ~/.config/zsh/common.zsh; anything below overrides them. Installers may append here.
-
-export NVM_DIR="$HOME/.nvm"
-  [ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"  # This loads nvm
-  [ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
+[ -f ~/.config/zsh/common.zsh ] && source ~/.config/zsh/common.zsh
 
 export PATH="/Applications/Tailscale.app/Contents/MacOS:$PATH"
-
-[ -f ~/.config/zsh/common.zsh ] && source ~/.config/zsh/common.zsh
 
 # Activate `fnm`: https://github.com/Schniz/fnm
 if command -v fnm >/dev/null; then
@@ -15,7 +10,7 @@ fi
 
 # Activate `direnv`: https://direnv.net/
 if command -v direnv >/dev/null; then
-    eval "$(direnv hook zsh)"
+    _cached_eval direnv direnv direnv hook zsh
 fi
 
 # Source the Nix environment.
@@ -25,19 +20,7 @@ elif [[ -f /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]]; then
     . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 fi
 
-[ -f "/Users/ethankeshishian/.ghcup/env" ] && . "/Users/ethankeshishian/.ghcup/env" # ghcup-env
-
-# bindkey              '^I' menu-select
-# bindkey "$terminfo[kcbt]" menu-select
-#
-# # all Tab widgets
-# zstyle ':autocomplete:*complete*:*' insert-unambiguous yes
-#
-# # all history widgets
-# zstyle ':autocomplete:*history*:*' insert-unambiguous yes
-#
-# # ^S
-# zstyle ':autocomplete:menu-search:*' insert-unambiguous yes
+[ -f "$HOME/.ghcup/env" ] && . "$HOME/.ghcup/env" # ghcup-env
 
 # Created by `pipx` on 2026-06-05 20:18:27
-export PATH="$PATH:/Users/ethankeshishian/.local/bin"
+export PATH="$PATH:$HOME/.local/bin"

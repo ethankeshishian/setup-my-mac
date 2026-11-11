@@ -25,7 +25,38 @@ return {
   "nvim-telescope/telescope.nvim",
   opts = function(_, opts)
     opts.defaults.wrap_results = true
-    
+
+    -- Draw the search icon as decoration instead of prompt text, so `_`, `0`, `I`,
+    -- yanks and word deletes only see what was typed.
+    local prompt_icon = opts.defaults.prompt_prefix or "   "
+    opts.defaults.prompt_prefix = ""
+    local prompt_ns = vim.api.nvim_create_namespace "ethan_telescope_prompt_icon"
+    vim.api.nvim_create_autocmd("FileType", {
+      pattern = "TelescopePrompt",
+      callback = function(ev)
+        vim.api.nvim_buf_set_extmark(ev.buf, prompt_ns, 0, 0, {
+          virt_text = { { prompt_icon, "TelescopePromptPrefix" } },
+          virt_text_pos = "inline",
+          right_gravity = false,
+        })
+      end,
+    })
+
+    -- Option-Backspace deletes a word the macOS way, same as in other insert-mode buffers.
+    -- Cmd-Backspace (Ghostty sends <C-u>) clears the prompt. This replaces telescope's
+    -- <C-u> preview scroll; <C-d> still scrolls the preview down.
+    local function clear_prompt(prompt_bufnr)
+      require("telescope.actions.state").get_current_picker(prompt_bufnr):reset_prompt()
+    end
+    opts.defaults.mappings = opts.defaults.mappings or {}
+    opts.defaults.mappings.i = vim.tbl_extend("force", opts.defaults.mappings.i or {}, {
+      ["<M-BS>"] = function() require("ethan.mac_word").backward_kill_word() end,
+      ["<C-u>"] = clear_prompt,
+    })
+    opts.defaults.mappings.n = vim.tbl_extend("force", opts.defaults.mappings.n or {}, {
+      ["<C-u>"] = clear_prompt,
+    })
+
     -- FIX: Buffer crash prevention
     opts.defaults.hl_result_eol = false
     
@@ -141,9 +172,15 @@ return {
 		opts.ensure_installed = vim.list_extend(opts.ensure_installed or {}, {
 			"html", "css",
 			"typescript", "javascript", "tsx",
-			"haskell", "haskell_persistent"
+			"haskell", "haskell_persistent",
+			-- Highlighting inside noice's command line for :s/regex/ and :!shell commands.
+			"regex", "bash",
 		})
 		return opts
+	end,
+	config = function(_, opts)
+		require("nvim-treesitter.configs").setup(opts)
+		require("ethan.treesitter_compat").apply()
 	end,
 },
 }

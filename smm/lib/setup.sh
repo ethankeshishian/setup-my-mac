@@ -163,7 +163,7 @@ step_host_done() {
       "$(smm_repo)/manifest/hosts.json" >/dev/null
 }
 smm_seed_host_zsh() {
-  local host=$1 repo file common local_zsh
+  local host=$1 repo file common retired local_zsh
   case "$host" in ''|-*|*[!a-zA-Z0-9-]*) warn 'invalid host name'; return 1 ;; esac
   repo=$(smm_repo) || return 1
   file="config/zsh/$host.zshrc"
@@ -172,6 +172,8 @@ smm_seed_host_zsh() {
   mkdir -p "$repo/config/zsh" || return 1
   common="$repo/config/zsh/common.zsh"
   [ -f "$common" ] || common=/dev/null
+  retired="$repo/config/zsh/retired-shared.zsh"
+  [ -f "$retired" ] || retired=/dev/null
   local_zsh="$HOME/.zshrc"
   [ -f "$local_zsh" ] || local_zsh=/dev/null
   {
@@ -194,7 +196,8 @@ smm_seed_host_zsh() {
       }
       FNR == 1 {
         flush()
-        reading_common = (FILENAME == ARGV[1])
+        # Every file before the existing ~/.zshrc lists shared lines.
+        reading_common = (FILENAME != ARGV[ARGC - 1])
       }
       {
         line = normalize($0)
@@ -206,7 +209,7 @@ smm_seed_host_zsh() {
         if (depth == 0) flush()
       }
       END { flush() }
-    ' "$common" "$local_zsh"
+    ' "$common" "$retired" "$local_zsh"
   } > "$repo/$file"
 }
 step_host_run() {

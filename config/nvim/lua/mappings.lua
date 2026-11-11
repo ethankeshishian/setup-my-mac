@@ -64,6 +64,6 @@ vim.keymap.set("t", "<C-right>", "<C-\\><C-n>:wincmd l<CR>")
 
 -- Coc keybindings
 
-map("i", "<M-BS>", "<C-w>", { noremap = true })
+map("i", "<M-BS>", function() require("ethan.mac_word").backward_kill_word() end, { desc = "delete word before cursor, macOS style" })
 map("n", "<leader>cp", ":let @+=expand('%')<CR>", { noremap = true, desc = "Copy current file path to clipboard" })
 map("n", "<leader>ca", "<cmd>lua vim.lsp.buf.code_action()<CR>", { desc = "LSP code actions" })

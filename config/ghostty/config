@@ -10,3 +10,7 @@ keybind = cmd+s>n=prompt_surface_title
 # Sends ESC+CR (same as Option+Enter) so Shift+Enter inserts a newline
 # in Claude Code inside tmux. The default `text:\n` doesn't survive tmux.
 keybind = shift+enter=text:\x1b\r
+# Cmd-Z sends Ctrl-_, the undo key in zsh and readline. Cmd-Shift-T still reopens closed tabs.
+keybind = super+z=text:\x1f
+# Option-C sends Esc-C (fzf's jump-to-folder key) instead of typing ç.
+keybind = alt+c=esc:c

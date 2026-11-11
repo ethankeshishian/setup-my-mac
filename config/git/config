@@ -1,0 +1,35 @@
+# Git settings shared by every Mac, linked to ~/.config/git/config.
+# Name, email and git-town aliases stay in each Mac's ~/.gitconfig, which wins on overlap.
+
+[core]
+	# Syntax-highlighted diffs with line numbers in git diff, show, log -p and stash show -p.
+	pager = delta
+[interactive]
+	# Same highlighting in git add -p.
+	diffFilter = delta --color-only
+[delta]
+	syntax-theme = Catppuccin Mocha
+	line-numbers = true
+	# n and N jump between files in a long diff.
+	navigate = true
+[merge]
+	# Conflict markers also show the original code between ||||||| and =======.
+	conflictStyle = zdiff3
+[diff]
+	colorMoved = default
+[rerere]
+	# Remember conflict resolutions and replay them when the same conflict comes back.
+	# The result is left unstaged so it can be checked first.
+	enabled = true
+[branch]
+	# git branch lists the most recently committed branches first.
+	sort = -committerdate
+[push]
+	# The first push of a new branch creates and tracks the remote branch.
+	autoSetupRemote = true
+[fetch]
+	# Forget remote branches that were deleted on the server.
+	prune = true
+[rebase]
+	# Stash uncommitted changes around a rebase instead of refusing to start.
+	autoStash = true

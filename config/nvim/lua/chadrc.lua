@@ -21,7 +21,28 @@ M.ui = {
 		enabled = true,
 	},
 	statusline = {
+		-- NvChad's default order, plus the search count before diagnostics.
+		order = { "mode", "file", "git", "%=", "lsp_msg", "%=", "search", "diagnostics", "lsp", "cwd", "cursor" },
 		modules = {
+			-- "/foo [2/5]" (or "?foo" after a backward search) while search matches are highlighted; gone after :noh. noice hides
+			-- Neovim's message line, so the count lives here instead.
+			search = function()
+				if vim.v.hlsearch == 0 then
+					return ""
+				end
+				local ok, count = pcall(vim.fn.searchcount, { maxcount = 999, timeout = 50 })
+				if not ok or (count.total or 0) == 0 then
+					return ""
+				end
+				local total = count.incomplete == 2 and ">" .. count.maxcount or count.total
+				local pattern = vim.fn.getreg("/"):gsub("%%", "%%%%")
+				-- While typing, the prompt's own type; afterwards, the last search's direction.
+				local prefix = vim.fn.getcmdtype()
+				if prefix ~= "/" and prefix ~= "?" then
+					prefix = vim.v.searchforward == 1 and "/" or "?"
+				end
+				return "%#St_LspMsg#" .. prefix .. pattern .. " [" .. count.current .. "/" .. total .. "] "
+			end,
 			file = function()
 				local stbufnr = vim.api.nvim_win_get_buf(vim.g.statusline_winid or 0)
 				local icon = "󰈚"

@@ -9,5 +9,6 @@
   {"name":"zsh-common","source":"config/zsh/common.zsh","target":".config/zsh/common.zsh","type":"file","validator":"zsh","reload":null},
   {"name":"p10k","source":"config/.p10k.zsh","target":".p10k.zsh","type":"file","validator":"zsh","reload":null},
   {"name":"mmf","source":"config/mmf/config.plist","target":"Library/Application Support/com.nuebling.mac-mouse-fix/config.plist","type":"file","validator":"plist","reload":null},
-  {"name":"nvim","source":"config/nvim","target":".config/nvim","type":"dir","validator":"nvim","reload":null}
+  {"name":"nvim","source":"config/nvim","target":".config/nvim","type":"dir","validator":"nvim","reload":null},
+  {"name":"git","source":"config/git/config","target":".config/git/config","type":"file","validator":"git","reload":null}
 ]

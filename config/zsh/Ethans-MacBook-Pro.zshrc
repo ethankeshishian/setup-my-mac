@@ -1,6 +1,11 @@
 # This Mac's own zsh setup. Shared settings live in ~/.config/zsh/common.zsh; anything below overrides them. Installers may append here.
 [ -f ~/.config/zsh/common.zsh ] && source ~/.config/zsh/common.zsh
 
+# AWS and Kubernetes helpers are only used on this Mac.
+zinit snippet OMZP::aws
+zinit snippet OMZP::kubectl
+zinit snippet OMZP::kubectx
+
 ###### Program configurations ######
 
 export DYLD_LIBRARY_PATH="$HOMEBREW_PREFIX/lib:$DYLD_LIBRARY_PATH" # ImageMagick / image.nvim installation step

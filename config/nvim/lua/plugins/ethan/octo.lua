@@ -8,7 +8,7 @@ return {
   config = function()
     require("octo").setup({
       default_remote = {"upstream", "origin"},
-      default_merge_method = "commit",
+      default_merge_method = "merge", -- a merge commit; Octo no longer accepts "commit"
       ssh_aliases = {},
       reaction_viewer_hint_icon = "",
       user_icon = " ",

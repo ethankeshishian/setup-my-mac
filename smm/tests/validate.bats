@@ -123,18 +123,21 @@ PY
   [ ! -e "$SMM_STATE/aerospace.swap" ]
   [ ! -e "$SMM_STATE/aerospace.lock" ]
 }
-@test "tmux zsh plist and ghostty use the specified validator arguments" {
+@test "tmux zsh plist ghostty and git use the specified validator arguments" {
   load_lib
   stub tmux 0
   stub zsh 0
   stub plutil 0
+  stub git 0
   validate_tmux "$TMP/tmux file"
   validate_zsh "$TMP/zsh file"
   validate_plist "$TMP/plist file"
   validate_ghostty "$TMP/ghostty dir"
+  validate_git "$TMP/git file"
   calls | grep -Fxq "tmux -L smm-validate -f /dev/null start-server ; source-file -n $TMP/tmux file ; kill-server"
   calls | grep -Fxq "zsh -n $TMP/zsh file"
   calls | grep -Fxq "plutil -lint $TMP/plist file"
+  calls | grep -Fxq "git config --file $TMP/git file --list"
   calls | grep -Fxq "ghostty +validate-config --config-file=$TMP/ghostty dir/config"
 }
 @test "aerospace restores when interrupted immediately after moving original" {

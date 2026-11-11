@@ -30,5 +30,5 @@ PY
 }
 
 @test "shared zsh keeps the fuck alias with pay-respects" {
-  rg -Fx 'eval "$(pay-respects zsh --alias fuck)"' "$REPO/config/zsh/common.zsh"
+  rg -Fx '_cached_eval pay-respects pay-respects pay-respects zsh --alias fuck --nocnf' "$REPO/config/zsh/common.zsh"
 }

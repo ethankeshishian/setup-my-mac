@@ -106,6 +106,8 @@ validate_sketchybar() {
 }
 validate_tmux() { tmux -L smm-validate -f /dev/null start-server \; source-file -n "$1" \; kill-server; }
 validate_zsh() { zsh -n "$1"; }
+# --list parses the whole file and fails on any syntax error.
+validate_git() { git config --file "$1" --list >/dev/null; }
 validate_plist() { plutil -lint "$1"; }
 validate_nvim() (
   dir=$1 tmp='' status=0 data='' cache=''

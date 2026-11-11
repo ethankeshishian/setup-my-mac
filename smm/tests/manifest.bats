@@ -78,7 +78,7 @@ setup() {
 @test "nix manifest contains the approved attribute names" {
   jq -e '. == [
     "aerospace", "sketchybar", "jankyborders", "ghostty-bin", "neovim", "tmux",
-    "ripgrep", "fd", "fzf", "zoxide", "pay-respects", "vivid", "git", "git-town", "gh",
+    "ripgrep", "fd", "fzf", "bat", "delta", "eza", "zoxide", "pay-respects", "vivid", "git", "git-town", "gh",
     "jq", "gitleaks", "python3", "lua-language-server", "typescript-language-server",
     "vscode-langservers-extracted", "stylua"
   ]' "$REPO/manifest/nix-packages.json"
