@@ -13,7 +13,7 @@ setup() {
   stub scutil 0 Test-Mac
   stub darwin-rebuild 0 '42 date (current)'
   stub sudo 0
-  sed -i '' 's/exit 0/exec "$@"/' "$TMP/bin/sudo"
+  sed_inplace 's/exit 0/exec "$@"/' "$TMP/bin/sudo"
 }
 @test "unchanged inputs returns 1" {
   smm_nix_inputs_hash > "$SMM_STATE/applied.hash"
@@ -41,7 +41,7 @@ setup() {
 @test "build failure leaves applied hash untouched" {
   printf old > "$SMM_STATE/applied.hash"
   stub darwin-rebuild 0 '42 date (current)'
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 [ "$1" != build ] || exit 1\
 ' "$TMP/bin/darwin-rebuild"
   run smm_build
@@ -61,7 +61,7 @@ setup() {
   [ "$(cat "$SMM_STATE/applied.hash")" = "$(smm_nix_inputs_hash)" ]
   printf old > "$SMM_STATE/applied.hash"
   stub darwin-rebuild 0 '42 date (current)'
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 [ "$1" != switch ] || exit 1\
 ' "$TMP/bin/darwin-rebuild"
   run smm_switch

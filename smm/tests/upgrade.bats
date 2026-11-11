@@ -13,7 +13,7 @@ setup() {
   for lib in "$REPO"/smm/lib/*.sh; do source "$lib"; done
   [ ! -f "$REPO/smm/cmd/upgrade.sh" ] || source "$REPO/smm/cmd/upgrade.sh"
   stub nix 0
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 printf '\''{"nodes":{"foo":{"locked":{"rev":"new"}}}}\\n'\'' > "$SMM_REPO/flake.lock"\
 ' "$TMP/bin/nix"
   stub nvim 0
@@ -63,7 +63,7 @@ printf '\''{"nodes":{"foo":{"locked":{"rev":"new"}}}}\\n'\'' > "$SMM_REPO/flake.
   [ "$status" -eq 0 ]; ! calls | grep -q 'brew upgrade'
 }
 @test "commit lists changed inputs and plugins and starts with upgrade" {
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 case "$*" in *update*) printf '\''{"plugin":{"commit":"new"}}\\n'\'' > "$SMM_REPO/config/nvim/lazy-lock.json" ;; esac\
 ' "$TMP/bin/nvim"
   run cmd_upgrade

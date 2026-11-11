@@ -48,7 +48,7 @@ load_lib() {
   printf 'original\n' > "$HOME/.aerospace.toml"
   stub aerospace 0
   # Keep the PATH stub alive until the validator is interrupted.
-  sed -i '' 's/exit 0/echo "$PPID" > "$TMP\/validator.pid"; sleep 20/' "$TMP/bin/aerospace"
+  sed_inplace 's/exit 0/echo "$PPID" > "$TMP\/validator.pid"; sleep 20/' "$TMP/bin/aerospace"
   export REPO
   python3 - <<'PY'
 import os, signal, subprocess, time
@@ -111,7 +111,7 @@ PY
   [ "$status" -ne 0 ]
   stub nvim 0
   printf 'printf "Error: startup failed\\n" >&2\n' >> "$TMP/bin/nvim"
-  sed -i '' '/^exit 0$/d' "$TMP/bin/nvim"
+  sed_inplace '/^exit 0$/d' "$TMP/bin/nvim"
   run validate_nvim "$TMP/bar"
   [ "$status" -ne 0 ]
 }
@@ -141,7 +141,7 @@ PY
   load_lib
   printf original > "$HOME/.aerospace.toml"
   stub mv 0
-  sed -i '' '/^exit 0$/d' "$TMP/bin/mv"
+  sed_inplace '/^exit 0$/d' "$TMP/bin/mv"
   cat >> "$TMP/bin/mv" <<'STUB'
 /bin/mv "$@" || exit 1
 if [ ! -e "$TMP/mv-interrupted" ]; then
@@ -163,7 +163,7 @@ STUB
   printf cache > "$XDG_CACHE_HOME/nvim/cached"
   printf state > "$XDG_STATE_HOME/nvim/session"
   stub nvim 0
-  sed -i '' '/^exit 0$/d' "$TMP/bin/nvim"
+  sed_inplace '/^exit 0$/d' "$TMP/bin/nvim"
   cat >> "$TMP/bin/nvim" <<'STUB'
 [ "$(cat "$XDG_DATA_HOME/nvim/lazy/installed")" = plugin ] || exit 91
 [ "$(cat "$XDG_CACHE_HOME/nvim/cached")" = cache ] || exit 92
@@ -195,13 +195,13 @@ STUB
   printf plugin > "$XDG_DATA_HOME/nvim/installed"
   printf cache > "$XDG_CACHE_HOME/nvim/cached"
   stub cp 0
-  sed -i '' '/^exit 0$/d' "$TMP/bin/cp"
+  sed_inplace '/^exit 0$/d' "$TMP/bin/cp"
   cat >> "$TMP/bin/cp" <<'STUB'
 [ "$1" != -cR ] || exit 1
 exec /bin/cp "$@"
 STUB
   stub nvim 0
-  sed -i '' '/^exit 0$/d' "$TMP/bin/nvim"
+  sed_inplace '/^exit 0$/d' "$TMP/bin/nvim"
   cat >> "$TMP/bin/nvim" <<'STUB'
 [ "$(cat "$XDG_DATA_HOME/nvim/installed")" = plugin ] || exit 91
 [ "$(cat "$XDG_CACHE_HOME/nvim/cached")" = cache ] || exit 92

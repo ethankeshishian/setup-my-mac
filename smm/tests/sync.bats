@@ -44,7 +44,7 @@ SCRIPT
   stub gh 0
   stub scutil 0 Test-Mac
   stub darwin-rebuild 0 '42 date (current)'
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 if [ "$1" = build ]; then mkdir -p result/sw/bin; fi\
 ' "$TMP/bin/darwin-rebuild"
   stub gitleaks 0

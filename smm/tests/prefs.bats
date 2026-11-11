@@ -56,7 +56,7 @@ app() { mkdir -p "$SMM_APPLICATIONS_DIR/$1.app/Contents"; echo plist > "$SMM_APP
   app AltTab
   stub plutil 0 '{"theme":"2","crashPolicy":"1","SUEnableAutomaticChecks":true,"updatePolicy":"2","MSAppCenterInstallId":"private","NSWindow Frame SettingsWindow":"frame","preferencesVersion":"old","settingsWindowShownOnFirstLaunch":true,"unknownID":"private","SULastCheckTime":"date","blob":{"data":"secret"}}'
   # Distinguish version extraction from conversion without touching real defaults.
-  sed -i '' '/if \[ -n "$stub_stdout" \]/i\
+  sed_inplace '/if \[ -n "$stub_stdout" \]/i\
 if [ "$1" = -extract ]; then echo 10.12.0; exit 0; fi\
 if [ "$1" = -convert ]; then printf "%s\\n" "$stub_stdout" > "$4"; exit 0; fi\
 ' "$TMP/bin/plutil"
@@ -70,7 +70,7 @@ if [ "$1" = -convert ]; then printf "%s\\n" "$stub_stdout" > "$4"; exit 0; fi\
   run "$REPO/smm/bin/smm" capture raycast; [ "$status" -eq 1 ]
   app Raycast
   stub plutil 0 '{"raycastGlobalHotkey":"Command-49","secret":"private"}'
-  sed -i '' '/if \[ -n "$stub_stdout" \]/i\
+  sed_inplace '/if \[ -n "$stub_stdout" \]/i\
 if [ "$1" = -extract ]; then echo 2.11.1.0; exit 0; fi\
 if [ "$1" = -convert ]; then printf "%s\\n" "$stub_stdout" > "$4"; exit 0; fi\
 ' "$TMP/bin/plutil"
@@ -118,7 +118,7 @@ if [ "$1" = -convert ]; then printf "%s\\n" "$stub_stdout" > "$4"; exit 0; fi\
   cp "$REPO/manifest/homebrew.json" "$SMM_REPO/manifest/homebrew.json"
   ! jq -e '.casks | index("alt-tab")' "$SMM_REPO/manifest/homebrew.json"
   stub brew 0
-  sed -i '' '/if \[ -n "$stub_stdout" \]/i\
+  sed_inplace '/if \[ -n "$stub_stdout" \]/i\
 if [ "$*" = "list --cask" ]; then echo alt-tab; fi\
 ' "$TMP/bin/brew"
   run smm_brew_duplicates; [ "$status" -eq 0 ]; [[ "$output" == *'cask alt-tab'* ]]

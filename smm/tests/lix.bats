@@ -18,7 +18,7 @@ stub_nix() {
   stub nix 0
   printf '%s\n' "$1" > "$TMP/version"
   printf '%s\n' "${2:-0}" > "$TMP/daemon-status"
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 case "$3" in\
   --version) cat "$TMP/version" ;;\
   store) exit "$(cat "$TMP/daemon-status")" ;;\
@@ -27,7 +27,7 @@ esac\
 }
 stub_repair() {
   stub "$1" "${2:-0}"
-  sed -i '' '/exit /i\
+  sed_inplace '/exit /i\
 printf "0\\n" > "$TMP/daemon-status"\
 ' "$TMP/bin/$1"
   cp "$TMP/bin/$1" "$SMM_NIX_ROOT/$1"
@@ -51,7 +51,7 @@ stub_download() {
 }
 @test "smm_nix adds feature flags and preserves argument boundaries" {
   stub nix 0
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 [ "$#" -eq 5 ] && [ "$2" = "nix-command flakes" ] && [ "$5" = "a path" ] || exit 98\
 ' "$TMP/bin/nix"
   run smm_nix eval --raw 'a path'
@@ -187,7 +187,7 @@ stub_download() {
   cp "$TMP/bin/nix" "$TMP/next-nix"
   rm "$TMP/bin/nix"
   stub_repair nix-installer
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 cp "$TMP/next-nix" "$TMP/bin/nix"\
 ' "$SMM_NIX_ROOT/nix-installer"
   run step_nix_run; [ "$status" -eq 0 ]

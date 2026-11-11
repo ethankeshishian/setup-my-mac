@@ -2,7 +2,7 @@
 
 smm_setup_steps() {
   # shellcheck disable=SC2034 # Consumed by cmd_setup in cmd/setup.sh.
-  SETUP_STEPS=(preflight host nix lock preview configs brew_adopt build dedupe switch permissions signin raycast secrets nvim health commit finish)
+  SETUP_STEPS=(preflight host nix lock preview configs brew_adopt brew_existing build dedupe switch permissions signin raycast secrets nvim health commit finish)
 }
 
 smm_permission_granted() {
@@ -302,6 +302,12 @@ step_brew_adopt_run() {
   if [ -n "${SMM_TX:-}" ]; then smm_tx_arm "$(smm_repo)/manifest/homebrew.json" || return 1; fi
   smm_setup_prune_duplicates && smm_brew_resolve
 }
+step_brew_existing_done() {
+  local unmanaged
+  unmanaged=$(smm_brew_unmanaged_casks) || return 1
+  [ -z "$unmanaged" ]
+}
+step_brew_existing_run() { smm_brew_adopt_unmanaged; }
 step_build_done() {
   local state hash path
   state=$(smm_state_dir) || return 1

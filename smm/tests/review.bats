@@ -19,7 +19,7 @@ setup() {
   stub scutil 0 Test-Mac
   stub darwin-rebuild 0 '42 date (current)'
   stub sudo 0
-  sed -i '' 's/exit 0/exec "$@"/' "$TMP/bin/sudo"
+  sed_inplace 's/exit 0/exec "$@"/' "$TMP/bin/sudo"
   stub sysctl 0 '{ sec = 100, usec = 0 }'
 }
 @test "review 1 config preparation keeps originals through build failure" {
@@ -57,7 +57,7 @@ setup() {
 @test "review 3 apply interruption during switch rolls back without finalizing hash" {
   echo previous > "$SMM_STATE/applied.hash"
   stub darwin-rebuild 0 '42 date (current)'
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 if [ "$1" = switch ] && [ "$2" = --flake ]; then kill -TERM "$PPID"; fi\
 ' "$TMP/bin/darwin-rebuild"
   run cmd_apply
@@ -215,7 +215,7 @@ if [ "$1" = switch ] && [ "$2" = --flake ]; then kill -TERM "$PPID"; fi\
 @test "review 11 piped bootstrap attaches setup stdin to controlling tty" {
   stub uname 0 arm64
   stub nix 0
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 [ -t 0 ] || exit 91\
 ' "$TMP/bin/nix"
   run run_tty /bin/bash "$REPO/bootstrap.sh"

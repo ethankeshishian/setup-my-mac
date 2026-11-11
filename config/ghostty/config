@@ -7,4 +7,6 @@ font-family = "MartianMono NFM"
 keybind = cmd+s>r=reload_config
 keybind = cmd+s>x=close_surface
 keybind = cmd+s>n=prompt_surface_title
-keybind = shift+enter=text:\n
+# Sends ESC+CR (same as Option+Enter) so Shift+Enter inserts a newline
+# in Claude Code inside tmux. The default `text:\n` doesn't survive tmux.
+keybind = shift+enter=text:\x1b\r

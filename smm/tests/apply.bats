@@ -22,13 +22,13 @@ setup() {
   stub scutil 0 Test-Mac
   stub pgrep 0
   stub sudo 0
-  sed -i '' 's/exit 0/exec "$@"/' "$TMP/bin/sudo"
+  sed_inplace 's/exit 0/exec "$@"/' "$TMP/bin/sudo"
   stub darwin-rebuild 0 '42 date (current)'
   smm_nix_inputs_hash > "$SMM_STATE/applied.hash"
 }
 @test "broken config is not reloaded and file untouched" {
   stub aerospace 0
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 if [[ "$*" == *--dry-run* ]]; then echo broken; exit 1; fi\
 ' "$TMP/bin/aerospace"
   before=$(shasum "$SMM_REPO/config/aero")
@@ -54,7 +54,7 @@ if [[ "$*" == *--dry-run* ]]; then echo broken; exit 1; fi\
 @test "build failure never switches" {
   rm "$SMM_STATE/applied.hash"
   stub darwin-rebuild 0 '42 date (current)'
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 [ "$1" != build ] || exit 1\
 ' "$TMP/bin/darwin-rebuild"
   run "$REPO/smm/bin/smm" apply
@@ -87,7 +87,7 @@ if [[ "$*" == *--dry-run* ]]; then echo broken; exit 1; fi\
 @test "cancelled accessibility wait rolls back without finalizing" {
   rm "$SMM_STATE/applied.hash"
   stub aerospace 0
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 [ "$1" != list-workspaces ] || exit 1\
 ' "$TMP/bin/aerospace"
   run "$REPO/smm/bin/smm" apply
@@ -124,11 +124,11 @@ if [[ "$*" == *--dry-run* ]]; then echo broken; exit 1; fi\
   source "$REPO/smm/cmd/apply.sh"
   rm "$SMM_STATE/applied.hash"
   stub aerospace 0
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 [ "$1" != list-workspaces ] || exit 1\
 ' "$TMP/bin/aerospace"
   stub pgrep 0
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 [ "$2" != borders ] || exit 1\
 ' "$TMP/bin/pgrep"
   smm_wait_permission() { stub aerospace 0 $'1\n2'; }

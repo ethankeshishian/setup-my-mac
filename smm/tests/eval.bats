@@ -41,6 +41,7 @@ setup_file() {
               c.services.sketchybar.extraPackages;
             sketchybarConfig = c.services.sketchybar.config;
             localHostName = c.networking.localHostName;
+            awsCaBundle = c.environment.variables.AWS_CA_BUNDLE or null;
             aerospaceEnabled = c.services.aerospace.enable;
             aerospaceService = c.launchd.user.agents.aerospace.serviceConfig;
             aerospacePath = c.launchd.user.agents.aerospace.path;
@@ -162,6 +163,15 @@ eval_raw() {
     eval_raw sketchybarConfig
     [ -z "$output" ]
   done
+}
+
+@test "Mercury keeps the AWS CA bundle that nix-darwin's /etc files would drop" {
+  HOST=Ethans-MacBook-Pro-Mercury
+  eval_raw awsCaBundle
+  [ "$output" = /Library/Mercury/certs/aws-ca-bundle.pem ]
+  HOST=Ethans-MacBook-Pro
+  eval_json awsCaBundle
+  [ "$output" = null ]
 }
 
 @test "host identity is fixed" {

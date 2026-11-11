@@ -28,7 +28,7 @@ commit_fixture() {
   smm_secrets_materialize
   file="$HOME/.config/sketchybar/scripts/weather.env.sh"
   [ "$(cat "$file")" = 'cached weather value' ]
-  [ "$(stat -f %Lp "$file")" = 600 ]
+  [ "$(stat -c %a "$file" 2>/dev/null || stat -f %Lp "$file")" = 600 ]
   calls | grep -qx 'op read op://smm/weather/env'
 }
 @test "op signed out warns and succeeds" {
@@ -44,7 +44,7 @@ commit_fixture() {
   smm_secrets_materialize --refresh
   [ "$(cat "$HOME/.config/sketchybar/scripts/weather.env.sh")" = refreshed ]
   stub op 0
-  sed -i '' 's/exit 0/if [ "$1" = read ]; then exit 1; fi/' "$TMP/bin/op"
+  sed_inplace 's/exit 0/if [ "$1" = read ]; then exit 1; fi/' "$TMP/bin/op"
   run smm_secrets_materialize --refresh
   [ "$status" -ne 0 ]
   [ "$(cat "$HOME/.config/sketchybar/scripts/weather.env.sh")" = refreshed ]

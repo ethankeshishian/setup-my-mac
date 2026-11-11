@@ -112,7 +112,7 @@ fixture_steps() {
 }
 @test "lock step pins and commits flake inputs when flake.lock is missing" {
   stub nix 0
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 if [ "$3 $4" = "flake lock" ]; then echo "{}" > flake.lock; fi\
 ' "$TMP/bin/nix"
   run step_lock_done; [ "$status" -ne 0 ]
@@ -133,7 +133,7 @@ if [ "$3 $4" = "flake lock" ]; then echo "{}" > flake.lock; fi\
   echo '{"taps":[],"brews":["sketchybar"],"casks":[]}' > "$SMM_REPO/manifest/homebrew.json"
   smm_brew_duplicates() { echo 'brew sketchybar'; }
   stub brew 0
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 if [ "$1" = uninstall ]; then grep -qx "brew sketchybar" "$SMM_STATE/deduped" || exit 99; fi\
 ' "$TMP/bin/brew"
   run step_dedupe_run; [ "$status" -eq 0 ]
@@ -179,7 +179,7 @@ if [ "$1" = uninstall ]; then grep -qx "brew sketchybar" "$SMM_STATE/deduped" ||
 @test "setup creates a missing 1Password item without putting the secret in argv" {
   echo '[{"name":"weather","op_ref":"op://smm/weather/env","target":"weather.env.sh"}]' > "$SMM_REPO/manifest/secrets.json"
   stub op 0
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 case "$*" in\
   "item get weather --vault smm --format json") [ -f "$TMP/created" ] || exit 1 ;;\
   "item create - --vault smm") cat > "$TMP/item.json"; touch "$TMP/created" ;;\

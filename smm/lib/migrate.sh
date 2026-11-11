@@ -85,6 +85,8 @@ smm_migrate_preview() (
   smm_brew_undeclared || exit 1
   log 'Homebrew duplicates of Nix packages:'
   smm_brew_duplicates || exit 1
+  log 'Declared apps installed outside Homebrew (setup adopts them):'
+  smm_brew_unmanaged_casks || exit 1
 )
 
 smm_migrate_resolve() (

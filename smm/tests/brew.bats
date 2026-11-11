@@ -70,3 +70,59 @@ setup() {
   [ "$status" -eq 0 ]
   [ "$output" = $'cask kitty\ncask firefox\nbrew wget\nbrew zstd' ]
 }
+
+# brew stub that answers list, info and install the way real brew does.
+stub_cask_brew() {
+  cat > "$TMP/bin/brew" <<'STUB'
+#!/usr/bin/env bash
+printf 'brew %s\n' "$*" >> "$TMP/calls.log"
+case "$1" in
+  list) printf 'kitty\n' ;;
+  info)
+    case "$4" in
+      arc) printf '%s\n' '{"casks":[{"artifacts":[{"uninstall":[{}]},{"app":["Arc.app"]}]}]}' ;;
+      mos) printf '%s\n' '{"casks":[{"artifacts":[{"app":["Mos.app",{"target":"Mos Renamed.app"}]}]}]}' ;;
+      broken) exit 1 ;;
+      *) printf '%s\n' '{"casks":[{"artifacts":[{"installer":[{}]}]}]}' ;;
+    esac ;;
+  install) [ "$3" = --adopt ] && [ "$4" = mos ] && exit 1; exit 0 ;;
+esac
+STUB
+  chmod +x "$TMP/bin/brew"
+  printf '%s\n' '{"taps":[],"brews":[],"casks":["arc","broken","kitty","logi","mos"]}' > "$SMM_REPO/manifest/homebrew.json"
+  mkdir -p "$SMM_APPLICATIONS_DIR/Arc.app" "$SMM_APPLICATIONS_DIR/Mos Renamed.app" "$SMM_APPLICATIONS_DIR/Kitty.app"
+}
+@test "unmanaged casks are declared apps already installed outside Homebrew" {
+  stub_cask_brew
+  run smm_brew_unmanaged_casks
+  [ "$status" -eq 0 ]
+  # kitty is Homebrew's already, logi installs no app, broken is unknown to brew info.
+  [ "$output" = $'arc\tArc.app\nmos\tMos Renamed.app' ]
+}
+@test "matching unmanaged app is adopted without replacing it" {
+  stub_cask_brew
+  printf '%s\n' '{"taps":[],"brews":[],"casks":["arc"]}' > "$SMM_REPO/manifest/homebrew.json"
+  smm_brew_adopt_unmanaged
+  calls | grep -qx 'brew install --cask --adopt arc'
+  ! calls | grep -q -- '--force'
+}
+@test "differing unmanaged app is never replaced without asking" {
+  stub_cask_brew
+  choose() { return 99; }
+  run smm_brew_adopt_unmanaged
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'Mos Renamed.app differs from the mos cask'* ]]
+  calls | grep -qx 'brew install --cask --adopt arc'
+  ! calls | grep -q -- '--force'
+}
+@test "differing unmanaged app is replaced only when chosen" {
+  stub_cask_brew
+  smm_brew_interactive() { return 0; }
+  choose() { printf 'stop setup\n'; }
+  run smm_brew_adopt_unmanaged
+  [ "$status" -eq 1 ]
+  ! calls | grep -q -- '--force'
+  choose() { printf 'replace it with the Homebrew version\n'; }
+  smm_brew_adopt_unmanaged
+  calls | grep -qx 'brew install --cask --force mos'
+}

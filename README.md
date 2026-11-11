@@ -37,6 +37,10 @@ before the attended migration. Setup compares local configs with the repo, offer
 which changes to keep, builds replacements before removing duplicate Homebrew
 packages, and activates the links. After installation, `smm` is on PATH. Fix a
 failed step and rerun setup. Restart requests are collected for one final prompt.
+Declared apps that were installed outside Homebrew are adopted in place; one whose
+version differs from its cask is replaced only after you confirm. Quit tmux and run
+setup from a plain terminal window: setup replaces Homebrew's tmux with Nix's, and
+the new client may not attach to servers the old one started.
 
 Nix implementation is per host in `manifest/hosts.json`: Mercury
 (`Ethans-MacBook-Pro-Mercury`) uses **Lix**; `Ethans-MacBook-Pro` uses

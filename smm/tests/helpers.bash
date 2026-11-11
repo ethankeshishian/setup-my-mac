@@ -45,6 +45,17 @@ STUB
   chmod +x "$TMP/bin/$name"
 }
 
+# GNU and BSD sed disagree on -i, and nix develop puts GNU sed first on PATH.
+# Rewriting in place with cat keeps the file's mode (stubs stay executable).
+sed_inplace() {
+  local script=$1 file=$2 tmp
+  tmp=$(mktemp) || return 1
+  sed "$script" "$file" > "$tmp" && cat "$tmp" > "$file"
+  local status=$?
+  rm -f "$tmp"
+  return "$status"
+}
+
 calls() {
   cat "$TMP/calls.log"
 }

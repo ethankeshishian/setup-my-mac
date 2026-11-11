@@ -9,7 +9,7 @@ setup() {
   stub plutil 0 2.11.1.0; stub open 0; stub op 0
   export SMM_TEST_DOCUMENT='{"id":"document1","title":"raycast-config","version":7,"updated_at":"2020-01-01T00:00:00Z","tags":["smm-raycast-version:2.11.1.0"]}'
   export SMM_TEST_VAULTS='[{"id":"vault1","name":"smm"}]'
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 case "$1 $2" in\
 "vault list") printf "%s\\n" "$SMM_TEST_VAULTS" ;;\
 "item get") printf "%s\\n" "$SMM_TEST_DOCUMENT" ;;\
@@ -45,8 +45,8 @@ esac\
 @test "import downloads private rayconfig confirms and records current version" {
   confirm() { [ "$1" = 'Imported?' ]; }
   stub open 0
-  sed -i '' '/exit 0/i\
-[ "$(stat -f %Lp "$1")" = 600 ] || exit 99\
+  sed_inplace '/exit 0/i\
+[ "$(stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1")" = 600 ] || exit 99\
 case "$1" in *.rayconfig) ;; *) exit 98 ;; esac\
 printf "%s\\n" "$1" > "$TMP/import-path"\
 ' "$TMP/bin/open"
@@ -87,7 +87,7 @@ printf "%s\\n" "$1" > "$TMP/import-path"\
 }
 @test "missing smm vault is a degraded import and save creates it" {
   stub op 0
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 case "$1 $2" in\
 "vault list") echo "[]" ;;\
 "document list") exit 1 ;;\
@@ -99,7 +99,7 @@ esac\
 }
 @test "document download failure never opens private temporary file" {
   stub op 0
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 case "$1 $2" in\
 "vault list") printf "%s\\n" "$SMM_TEST_VAULTS" ;;\
 "document list") printf "[%s]\\n" "$SMM_TEST_DOCUMENT" ;;\
@@ -122,7 +122,7 @@ esac\
 }
 @test "interrupted import removes temporary export before returning" {
   stub open 0
-  sed -i '' '/exit 0/i\
+  sed_inplace '/exit 0/i\
 printf "%s\\n" "$1" > "$TMP/import-path"\
 kill -TERM "$PPID"\
 ' "$TMP/bin/open"

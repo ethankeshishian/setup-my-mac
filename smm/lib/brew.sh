@@ -47,6 +47,47 @@ smm_brew_add() {
   fi
 }
 smm_brew_interactive() { [ "${SMM_YES:-0}" != 1 ] && smm_has_tty; }
+# The app bundle a cask installs, by its installed (target) name.
+smm_cask_app_name() {
+  HOMEBREW_NO_AUTO_UPDATE=1 brew info --cask --json=v2 "$1" | jq -r '
+    [.casks[0].artifacts[] | .app? // empty | (map(objects | .target) | first) // (map(strings) | first)]
+    | first // empty | split("/") | last'
+}
+# Declared casks whose app is already in Applications without Homebrew managing it.
+# Activation's brew bundle refuses to install over these, which aborts the switch.
+smm_brew_unmanaged_casks() {
+  command -v brew >/dev/null 2>&1 || return 0
+  local apps=${SMM_APPLICATIONS_DIR:-/Applications} installed casks cask app
+  installed=$(brew list --cask) || return 1
+  casks=$(jq -r '.casks[]' "$(smm_repo)/manifest/homebrew.json") || return 1
+  while IFS= read -r cask; do
+    [ -n "$cask" ] || continue
+    grep -Fxq -- "${cask##*/}" <<< "$installed" && continue
+    # Unknown to brew info (offline, renamed cask): leave it to brew bundle.
+    app=$(smm_cask_app_name "$cask" 2>/dev/null) || app=''
+    if [ -n "$app" ] && [ -d "$apps/$app" ]; then printf '%s\t%s\n' "$cask" "$app"; fi
+  done <<< "$casks"
+}
+smm_brew_adopt_unmanaged() {
+  local unmanaged cask app answer
+  unmanaged=$(smm_brew_unmanaged_casks) || return 1
+  while IFS=$'\t' read -r cask app; do
+    [ -n "$cask" ] || continue
+    # --adopt takes over the existing app; it refuses one whose version differs
+    # unless the cask auto-updates.
+    HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask --adopt "$cask" && continue
+    answer=''
+    if smm_brew_interactive; then
+      answer=$(choose "$app is installed outside Homebrew and differs from the $cask cask" \
+        'replace it with the Homebrew version' 'stop setup') || answer=''
+    fi
+    if [ "$answer" != 'replace it with the Homebrew version' ]; then
+      warn "$app differs from the $cask cask. Run brew install --cask --force $cask, or remove $cask from manifest/homebrew.json, then rerun setup."
+      return 1
+    fi
+    HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask --force "$cask" || return 1
+  done <<< "$unmanaged"
+}
 smm_brew_resolve() {
   local packages kind name answer
   packages=$(smm_brew_undeclared) || return 1
