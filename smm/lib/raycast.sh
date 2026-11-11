@@ -57,6 +57,16 @@ step_raycast_run() (
     warn "Raycast is $installed but config was exported from $exporting; update Raycast before importing"; exit 1;
   }
   id=$(jq -er .id <<< "$document") && revision=$(smm_raycast_revision <<< "$document") || exit 1
+  acknowledgement=''; result=0
+  acknowledgement=$(smm_answer_value user.raycast) || result=$?
+  case "$result" in 0|4) ;; *) warn 'invalid answer user.raycast'; exit 1 ;; esac
+  case "$acknowledgement" in done|'') ;; *) warn 'invalid answer user.raycast (allowed: done)'; exit 1 ;; esac
+  if [ "$acknowledgement" = "done" ] && [ -f "$state/raycast-pending" ] &&
+      [ "$(cat "$state/raycast-pending")" = "$revision" ]; then
+    printf '%s\n' "$revision" > "$state/raycast-imported" || exit 1
+    rm -f "$skipped" "$state/raycast-pending"
+    exit 0
+  fi
   tmp=$(mktemp -d) || exit 1
   trap 'rm -rf "$tmp"' EXIT
   trap 'exit 130' INT
@@ -69,11 +79,14 @@ step_raycast_run() (
   current=$(smm_raycast_document) || exit 1
   [ "$(smm_raycast_revision <<< "$current")" = "$revision" ] || { warn 'Raycast export changed; rerun setup'; exit 1; }
   open "$file" || exit 1
+  printf '%s\n' "$revision" > "$state/raycast-pending" || exit 1
   log 'Raycast will ask for the export password in its import dialog.'
   # SMM_YES must never acknowledge an unattended import dialog.
-  SMM_YES=0 confirm 'Imported?' || exit 1
+  instruction='Imported?'
+  smm_has_tty || instruction='Complete the Raycast password/import dialog, then confirm it was imported.'
+  smm_user_wait raycast "$instruction" '' || exit "$?"
   printf '%s\n' "$revision" > "$state/raycast-imported" || exit 1
-  rm -f "$skipped"
+  rm -f "$skipped" "$state/raycast-pending"
 )
 smm_raycast_reminder() {
   local document exporting timestamp now

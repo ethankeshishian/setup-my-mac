@@ -103,7 +103,10 @@ smm_migrate_resolve() (
   else
     [ "$?" -eq 1 ] || exit 1
   fi
-  if [ "$status" = repo-newer ]; then answer='use repo';
+  if [ -n "${SMM_ANSWERS:-}" ] || { [ "${SMM_AGENT_SETUP:-0}" = 1 ] && ! smm_has_tty; }; then
+    answer=$(smm_answer "config.$name" "$name: $status" repo local) || exit "$?"
+    case "$answer" in repo) answer='use repo' ;; local) answer='use this Mac' ;; esac
+  elif [ "$status" = repo-newer ]; then answer='use repo';
   else answer=$(choose "$name: $status" 'use repo' 'use this Mac' 'pick changes') || exit 1; fi
   backup=$(smm_backup_dir) || exit 1
   mkdir -p "$backup/$(dirname "$target")" || exit 1

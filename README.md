@@ -49,11 +49,20 @@ switches an existing installation to another. New hosts choose their implementat
 and get a host file plus their own zsh config. Setup automatically creates and
 commits `flake.lock` when missing; subsequent Macs share its pinned inputs.
 
+## Agent-assisted setup
+
+Use `smm/bin/smm setup --plan [file]`, fill the generated answers from Ethan's
+choices, then run `smm/bin/smm setup --answers <file>`. Exit code 3 means setup
+needs an answer or a user action; `SMM-NEEDS` and `SMM-WAITING` also go to
+`~/.local/state/smm/needs.log`. See [the pasteable agent instructions](docs/agent-setup.md).
+Setup reviews conflicting `/etc` shell files and preserves approved customizations
+in `hosts/etc/<host>.nix` before rebuilding and activating.
+
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
-| `smm setup [--preview]` | Set up or migrate a Mac; preview differences first and resume failed steps safely. |
+| `smm setup [--preview | --plan [file] | --answers file]` | Set up or migrate a Mac; preview differences first and resume failed steps safely. |
 | `smm apply` | Validate configs, build and activate changed Nix inputs, check health, and reload valid apps. |
 | `smm sync [-m "message"]` | Commit valid edits, validate incoming changes, scan outgoing history, apply, and push; otherwise prompt for the message. |
 | `smm add <path> [--name <name>]` | Import a local config into the repo and link it, leaving changes uncommitted. |

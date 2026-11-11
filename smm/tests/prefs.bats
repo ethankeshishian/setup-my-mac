@@ -107,8 +107,9 @@ if [ "$1" = -convert ]; then printf "%s\\n" "$stub_stdout" > "$4"; exit 0; fi\
   [ "$(calls | grep -c '^open -a AltTab$')" -eq 2 ]
 }
 @test "AltTab permissions open both panes and require explicit confirmation" {
-  run smm_wait_permission alttab; [ "$status" -eq 1 ]
+  run smm_wait_permission alttab; [ "$status" -eq 3 ]
   calls | grep -q Privacy_Accessibility; calls | grep -q Privacy_ScreenCapture
+  smm_has_tty() { return 0; }
   confirm() { [ "$1" = 'AltTab has Accessibility AND Screen Recording. Done?' ]; }
   run smm_wait_permission alttab; [ "$status" -eq 0 ]
   run smm_permission_granted alttab; [ "$status" -ne 0 ]

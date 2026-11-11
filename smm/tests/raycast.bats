@@ -43,6 +43,7 @@ esac\
   ! calls | grep -q 'op document create'
 }
 @test "import downloads private rayconfig confirms and records current version" {
+  smm_has_tty() { return 0; }
   confirm() { [ "$1" = 'Imported?' ]; }
   stub open 0
   sed_inplace '/exit 0/i\
@@ -58,6 +59,7 @@ printf "%s\\n" "$1" > "$TMP/import-path"\
   run step_raycast_done; [ "$status" -eq 1 ]
 }
 @test "cancelled import cleans temp and never records completion" {
+  smm_has_tty() { return 0; }
   confirm() { return 1; }
   run step_raycast_run; [ "$status" -eq 1 ]
   [ ! -e "$SMM_STATE/raycast-imported" ]
@@ -133,4 +135,13 @@ kill -TERM "$PPID"\
   ln -s "$HOME/export.rayconfig" "$SMM_REPO/export.rayconfig"
   run cmd_raycast save "$SMM_REPO/export.rayconfig"
   [ "$status" -eq 1 ]; [[ "$output" == *'inside the repo'* ]]
+}
+@test "agent import pauses with instructions and acknowledgement resumes without reopening dialog" {
+  run step_raycast_run; [ "$status" -eq 3 ]
+  [[ "$output" == *'SMM-NEEDS: user raycast:'*'password/import dialog'* ]]
+  export SMM_ANSWERS="$TMP/answers.json"
+  echo '{"user.raycast":"done"}' > "$SMM_ANSWERS"
+  run step_raycast_run; [ "$status" -eq 0 ]
+  [ "$(calls | grep -c '^open ')" -eq 1 ]
+  [ "$(cat "$SMM_STATE/raycast-imported")" = document1:7 ]
 }

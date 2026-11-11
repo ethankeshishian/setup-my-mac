@@ -71,7 +71,7 @@ links_resolved_json() {
 smm_nix() {
   if [ "${1:-}" = --sudo ]; then
     shift
-    sudo nix --extra-experimental-features 'nix-command flakes' "$@"
+    smm_sudo nix --extra-experimental-features 'nix-command flakes' "$@"
   else
     nix --extra-experimental-features 'nix-command flakes' "$@"
   fi
@@ -120,4 +120,19 @@ smm_has_tty() { ( : </dev/tty ) 2>/dev/null; }
 # Home Manager may link through several store symlinks.
 smm_linked_to() {
   [ -L "$1" ] && [ "$(readlink -f "$1")" = "$(readlink -f "$2")" ]
+}
+
+smm_sudo() {
+  if smm_has_tty; then sudo "$@";
+  else
+    local root
+    root=$(smm_resource_root) || return 1
+    export SUDO_ASKPASS="$root/libexec/askpass"
+    sudo -A "$@"
+  fi
+}
+smm_resource_root() {
+  local dir
+  dir=$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || return 1
+  printf '%s\n' "$dir"
 }

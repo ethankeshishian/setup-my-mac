@@ -40,7 +40,8 @@
                 users.ethankeshishian = import ./modules/home;
               };
             }
-          ];
+          ] ++ nixpkgs.lib.optional (builtins.pathExists ./hosts/etc/${host}.nix)
+            ./hosts/etc/${host}.nix;
         };
     in
     {

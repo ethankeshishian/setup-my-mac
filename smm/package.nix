@@ -9,5 +9,7 @@
     mkdir -p "$out/lib" "$out/cmd"
     cp -R ${./lib}/. "$out/lib/"
     cp -R ${./cmd}/. "$out/cmd/"
+    cp -R ${./data} "$out/data"
+    cp -R ${./libexec} "$out/libexec"
   '';
 })

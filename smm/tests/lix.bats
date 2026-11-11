@@ -62,7 +62,7 @@ stub_download() {
   stub sudo 0
   run smm_nix --sudo run example -- switch
   [ "$status" -eq 0 ]
-  calls | grep -qx 'sudo nix --extra-experimental-features nix-command flakes run example -- switch'
+  calls | grep -qx 'sudo -A nix --extra-experimental-features nix-command flakes run example -- switch'
 }
 @test "host implementation follows smm_host and defaults unknown hosts to determinate" {
   run smm_nix_impl; [ "$status" -eq 0 ]; [ "$output" = lix ]

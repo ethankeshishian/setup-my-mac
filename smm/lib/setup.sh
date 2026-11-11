@@ -2,7 +2,7 @@
 
 smm_setup_steps() {
   # shellcheck disable=SC2034 # Consumed by cmd_setup in cmd/setup.sh.
-  SETUP_STEPS=(preflight host nix lock preview configs brew_adopt brew_existing build dedupe switch permissions signin raycast secrets nvim health commit finish)
+  SETUP_STEPS=(preflight host nix lock preview configs brew_adopt brew_existing build etc dedupe switch permissions signin raycast secrets nvim health commit finish)
 }
 
 smm_permission_granted() {
@@ -25,7 +25,7 @@ smm_wait_permission() {
       warn 'Grant AltTab Accessibility AND Screen Recording in System Settings.'
       open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility' || return 1
       open 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture' || return 1
-      SMM_YES=0 confirm 'AltTab has Accessibility AND Screen Recording. Done?'
+      smm_user_wait alttab 'AltTab has Accessibility AND Screen Recording. Done?' ''
       return "$?" ;;
     *) warn "unknown permission check: $app"; return 2 ;;
   esac
@@ -38,10 +38,13 @@ smm_wait_permission() {
       open 'x-apple.systempreferences:com.apple.LoginItems-Settings.extension?ExtensionItems' || return 1
       open 'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent' || return 1 ;;
   esac
-  if [ "$check_status" -eq 127 ] || ! command -v "$checker" >/dev/null 2>&1; then confirm 'Done?'; return "$?"; fi
-  # A noninteractive caller cannot grant permission; fail with the pane open.
-  smm_has_tty || return 1
-  while ! smm_permission_granted "$app"; do sleep 2; done
+  if [ "$check_status" -eq 127 ] || ! command -v "$checker" >/dev/null 2>&1; then
+    smm_user_wait "$app" "Grant $app $label in System Settings. Done?" ''
+  elif ! smm_has_tty; then
+    smm_user_wait "$app" "Grant $app $label in System Settings." smm_permission_granted "$app"
+  else
+    while ! smm_permission_granted "$app"; do sleep 2; done
+  fi
 }
 smm_restart_pending() {
   local state boot recorded
@@ -94,13 +97,13 @@ smm_install_determinate() (
   tmp=$(mktemp -d) || exit 1
   trap 'rm -rf "$tmp"' EXIT
   curl -fsSL https://install.determinate.systems/nix -o "$tmp/installer" || exit 1
-  sh "$tmp/installer" install
+  smm_installer_run "$tmp/installer" install
 )
 smm_install_lix() (
   tmp=$(mktemp -d) || exit 1
   trap 'rm -rf "$tmp"' EXIT
   curl -sSf -L https://install.lix.systems/lix -o "$tmp/installer" || exit 1
-  sh "$tmp/installer" install
+  smm_installer_run "$tmp/installer" install
 )
 step_nix_run() {
   local root impl version installed=0
@@ -120,11 +123,11 @@ step_nix_run() {
   fi
   case "$impl" in
     determinate)
-      if [ -x "$root/nix-installer" ]; then "$root/nix-installer" repair || return 1
+      if [ -x "$root/nix-installer" ]; then smm_installer_run "$root/nix-installer" repair || return 1
       else smm_install_determinate || return 1; fi ;;
     lix)
       if [ "$installed" -eq 0 ]; then smm_install_lix || return 1
-      elif [ -x "$root/lix-installer" ]; then "$root/lix-installer" repair || return 1
+      elif [ -x "$root/lix-installer" ]; then smm_installer_run "$root/lix-installer" repair || return 1
       else
         warn 'Lix is unhealthy and /nix/lix-installer is unavailable; repair Lix manually before rerunning setup.'
         return 1
@@ -209,14 +212,20 @@ smm_seed_host_zsh() {
 step_host_run() {
   local current host repo impl tmp
   repo=$(smm_repo); current=$(smm_host) || return 1
-  printf 'Host name [%s]: ' "$current" >&2
-  IFS= read -r host </dev/tty || return 1
+  if [ -n "${SMM_ANSWERS:-}" ] || ! smm_has_tty; then
+    host=$(smm_answer host.name "Host name [$current]:" text) || return "$?"
+  else
+    printf 'Host name [%s]: ' "$current" >&2
+    IFS= read -r host </dev/tty || return 1
+  fi
   host=${host:-$current}
   case "$host" in ''|*[!a-zA-Z0-9-]*|-*|template) warn 'invalid host name'; return 1 ;; esac
   [ "${#host}" -le 63 ] || return 1
   impl=$(jq -r --arg host "$host" '.[$host].nix // empty' "$repo/manifest/hosts.json") || return 1
   if [ -z "$impl" ]; then
-    impl=$(choose 'Choose Nix implementation' determinate lix) || return 1
+    if [ -n "${SMM_ANSWERS:-}" ] || ! smm_has_tty; then
+      impl=$(smm_answer host.nix 'Choose Nix implementation' determinate lix) || return "$?"
+    else impl=$(choose 'Choose Nix implementation' determinate lix) || return 1; fi
     case "$impl" in determinate|lix) ;; *) return 1 ;; esac
     tmp=$(mktemp "$repo/manifest/.hosts.XXXXXX") || return 1
     if ! jq --arg host "$host" --arg impl "$impl" '.[$host].nix = $impl' \
@@ -237,7 +246,7 @@ step_host_run() {
   export SMM_HOST="$host"
 }
 step_preview_done() { return 1; }
-step_preview_run() { smm_migrate_preview && smm_run_validate "$(smm_repo)" aerospace && confirm 'Continue?'; }
+step_preview_run() { smm_migrate_preview && smm_run_validate "$(smm_repo)" aerospace && smm_setup_confirm continue 'Continue?'; }
 step_configs_done() {
   local names name status
   names=$(link_names) || return 1
@@ -271,7 +280,7 @@ step_configs_run() {
       saved="$backup/$target"
       if [ -e "$saved" ] || [ -L "$saved" ]; then saved=$(mktemp -d "$backup/retry.XXXXXX")/original; fi
       cp -a "$HOME/$target" "$saved" || return 1
-    else smm_migrate_resolve "$name" || return 1; fi
+    else smm_migrate_resolve "$name" || return "$?"; fi
   done <<< "$names"
 }
 
@@ -414,31 +423,84 @@ step_permissions_done() {
   ! smm_app_bundle alttab >/dev/null
 }
 step_permissions_run() {
-  smm_wait_permission aerospace || return 1
-  smm_wait_permission karabiner || return 1
+  smm_wait_permission aerospace || return "$?"
+  smm_wait_permission karabiner || return "$?"
   # Start the Nix-installed AltTab so it can ask for, and use, its permissions.
   if smm_app_bundle alttab >/dev/null; then open -a "$(smm_app_bundle alttab)" || :; smm_wait_permission alttab; fi
 }
 step_signin_done() { op whoami >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; }
-step_signin_run() {
-  local file
-  file="$(smm_state_dir)/signin-skipped"
+step_signin_run() (
+  local file answer result=0 pid='' state
+  trap '[ -z "$pid" ] || { kill "$pid" 2>/dev/null || :; wait "$pid" 2>/dev/null || :; }' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  state=$(smm_state_dir) || return 1
+  file="$state/signin-skipped"
   : > "$file"
-  if ! op whoami >/dev/null 2>&1; then
-    if smm_has_tty && confirm 'Sign in to 1Password now?'; then
-      open -a '1Password' || return 1
-      while ! op whoami >/dev/null 2>&1; do
-        confirm 'Enable 1Password CLI integration. Done (or cancel to skip)?' || break
-      done
+  if [ -n "${SMM_ANSWERS:-}" ] || ! smm_has_tty; then
+    if ! op whoami >/dev/null 2>&1; then
+      answer=$(smm_answer signin.op 'Sign in to 1Password now?' now skip) || return "$?"
+      case "$answer" in
+        skip) printf '1Password not signed in (weather disabled)\n' >> "$file" ;;
+        now)
+          open -a '1Password' || return 1
+          smm_user_wait op 'Unlock/sign in to 1Password and enable CLI integration' smm_op_ready || return "$?" ;;
+        *) warn 'invalid answer signin.op (allowed: now skip)'; return 1 ;;
+      esac
     fi
-    op whoami >/dev/null 2>&1 || printf '1Password not signed in (weather disabled)\n' >> "$file"
-  fi
-  if ! gh auth status >/dev/null 2>&1; then
-    if smm_has_tty && confirm 'Sign in to GitHub now?'; then gh auth login || :; fi
-    gh auth status >/dev/null 2>&1 || printf 'GitHub not signed in (push disabled)\n' >> "$file"
+    if ! gh auth status >/dev/null 2>&1; then
+      answer=$(smm_answer signin.gh 'Sign in to GitHub now?' now skip) || return "$?"
+      case "$answer" in
+        skip) printf 'GitHub not signed in (push disabled)\n' >> "$file" ;;
+        now)
+          # gh prints its one-time code before waiting. Prefix every line so
+          # an agent can relay it; keep the login process alive while polling.
+          : > "$state/gh-login.output" || return 1
+          gh auth login --web > "$state/gh-login.output" 2>&1 </dev/null &
+          pid=$!
+          result=0
+          smm_wait_github "$state/gh-login.output" || result=$?
+          kill "$pid" 2>/dev/null || :; wait "$pid" 2>/dev/null || :; pid=''
+          [ "$result" -eq 0 ] || return "$result" ;;
+        *) warn 'invalid answer signin.gh (allowed: now skip)'; return 1 ;;
+      esac
+    fi
+  else
+    if ! op whoami >/dev/null 2>&1; then
+      if smm_setup_confirm signin.op 'Sign in to 1Password now?'; then
+        open -a '1Password' || return 1
+        while ! op whoami >/dev/null 2>&1; do
+          smm_setup_confirm user.op 'Enable 1Password CLI integration. Done (or cancel to skip)?' || break
+        done
+      fi
+      op whoami >/dev/null 2>&1 || printf '1Password not signed in (weather disabled)\n' >> "$file"
+    fi
+    if ! gh auth status >/dev/null 2>&1; then
+      if smm_setup_confirm signin.gh 'Sign in to GitHub now?'; then gh auth login --web || :; fi
+      gh auth status >/dev/null 2>&1 || printf 'GitHub not signed in (push disabled)\n' >> "$file"
+    fi
   fi
   if [ -s "$file" ]; then warn "degraded: $(cat "$file")"; fi
   return 0
+)
+smm_op_ready() { op whoami >/dev/null 2>&1; }
+smm_wait_github() {
+  local elapsed=0 limit=${SMM_WAIT_SECONDS:-600} line seen=0 count=0
+  case "$limit" in ''|*[!0-9]*) warn 'invalid SMM_WAIT_SECONDS'; return 1 ;; esac
+  smm_signal SMM-WAITING 'Complete GitHub web authentication' || return 1
+  while :; do
+    count=0
+    while IFS= read -r line; do
+      count=$((count + 1))
+      [ "$count" -le "$seen" ] || smm_signal SMM-NEEDS "user gh: $line" || return 1
+    done < "$1"
+    seen=$count
+    gh auth status >/dev/null 2>&1 && return 0
+    [ "$elapsed" -lt "$limit" ] || break
+    sleep 2; elapsed=$((elapsed + 2))
+  done
+  smm_signal SMM-NEEDS 'user gh: Complete GitHub web authentication, then rerun setup' || return 1
+  return 3
 }
 step_secrets_done() {
   local target targets
@@ -475,16 +537,28 @@ step_secrets_run() (
       case "$ref" in op://*/*/*) ;; *) warn "invalid 1Password reference: $name"; exit 1 ;; esac
       path=${ref#op://}; vault=${path%%/*}; path=${path#*/}; item=${path%%/*}; field=${path#*/}
       if ! op item get "$item" --vault "$vault" --format json >/dev/null 2>&1; then
-        if ! confirm "Create missing 1Password item $vault/$item for $name?"; then
+        if [ -n "${SMM_ANSWERS:-}" ] || ! smm_has_tty; then
+          answer=$(smm_answer "secret.$name.create" "Create missing 1Password item $vault/$item for $name?" yes no) || exit "$?"
+        elif confirm "Create missing 1Password item $vault/$item for $name?"; then answer=yes;
+        else answer=no; fi
+        if [ "$answer" = no ]; then
           printf '%s secret not configured\n' "$name" >> "$skipped"
           continue
         fi
+        if ! smm_has_tty; then
+          open -a '1Password' || exit 1
+          smm_user_wait "secret.$name" "Create/populate $vault/$item in 1Password, then rerun setup" '' || exit "$?"
+          op item get "$item" --vault "$vault" --format json >/dev/null 2>&1 || {
+            smm_signal SMM-NEEDS "user secret.$name: Create/populate $vault/$item in 1Password, then rerun setup"; exit 3;
+          }
+        else
         if ! op vault get "$vault" >/dev/null 2>&1; then op vault create "$vault" >/dev/null 2>&1 || exit 1; fi
         smm_setup_read_secret "$tmp/value" || exit 1
         # 1Password's item JSON template keeps the value on stdin, never argv.
         jq -n --arg title "$item" --arg field "$field" --rawfile value "$tmp/value" \
           '{title:$title,category:"SECURE_NOTE",fields:[{id:$field,label:$field,type:"CONCEALED",value:$value}]}' > "$tmp/item.json" || exit 1
         op item create - --vault "$vault" < "$tmp/item.json" >/dev/null 2>&1 || { warn "could not create $name item"; exit 1; }
+        fi
       fi
     fi
     jq --argjson entry "$entry" '. + [$entry]' "$tmp/repo/manifest/secrets.json" > "$tmp/next.json" || exit 1
@@ -523,8 +597,12 @@ step_commit_run() (
   cd "$(smm_repo)" || exit 1
   if [ -n "$(git status --porcelain)" ]; then
     smm_run_validate "$(smm_repo)" || exit 1
-    printf 'Commit message: ' >&2
-    IFS= read -r message </dev/tty || exit 1
+    if [ -n "${SMM_ANSWERS:-}" ] || ! smm_has_tty; then
+      message=$(smm_answer commit_message 'Commit message:' text) || exit "$?"
+    else
+      printf 'Commit message: ' >&2
+      IFS= read -r message </dev/tty || exit 1
+    fi
     case "$message" in *[![:space:]]*) ;; *) warn 'empty commit message'; exit 1 ;; esac
     git add -A && git commit -m "$message" || exit 1
   fi
@@ -536,7 +614,7 @@ step_commit_run() (
 )
 step_finish_done() { return 1; }
 step_finish_run() {
-  local state
+  local state answer
   state=$(smm_state_dir) || return 1
   log 'Setup complete. Still manual: App Store and iCloud sign-in.'
   [ ! -s "$state/signin-skipped" ] || cat "$state/signin-skipped"
@@ -544,6 +622,9 @@ step_finish_run() {
   [ ! -s "$state/raycast-skipped" ] || cat "$state/raycast-skipped"
   if smm_restart_pending; then
     log 'Restart needed:'; cat "$state/restart-needed"
-    if confirm 'Restart now?'; then osascript -e 'tell app "System Events" to restart'; fi
+    if [ -n "${SMM_ANSWERS:-}" ] || ! smm_has_tty; then
+      answer=$(smm_answer restart 'Restart now?' now later) || return "$?"
+      [ "$answer" != now ] || osascript -e 'tell app "System Events" to restart'
+    elif confirm 'Restart now?'; then osascript -e 'tell app "System Events" to restart'; fi
   fi
 }

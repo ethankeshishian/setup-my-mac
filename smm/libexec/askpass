@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# sudo captures stdout directly. Never log, cache, or pass the password in argv.
+exec osascript -e 'text returned of (display dialog "Enter your Mac password to continue setup." default answer "" with hidden answer with title "smm needs your Mac password" buttons {"Cancel", "Continue"} default button "Continue")'

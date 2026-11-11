@@ -11,6 +11,10 @@ setup_tmp() {
   export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_NOSYSTEM=1
   unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
   unset SMM_NIX_ROOT SMM_APPLICATIONS_DIR SMM_SKIP_PREFS SMM_TEST_DOCUMENT SMM_TEST_VAULTS
+  unset SMM_ANSWERS SMM_AGENT_SETUP SMM_FLAKE_REF SMM_PLAN SUDO_ASKPASS
+  export SMM_ETC_ROOT="$TMP/etc"
+  mkdir -p "$SMM_ETC_ROOT"
+  export SMM_WAIT_SECONDS=0
   unset SMM_TX SMM_REPO SMM_BACKUP SMM_HOST SMM_YES SMM_SKIP_AEROSPACE
   unset SMM_APPLY_CMD SMM_VALIDATE_CMD SMM_SETUP_ORIGINAL_PATH
   export SMM_APPLICATIONS_DIR="$TMP/Applications"
@@ -38,6 +42,7 @@ stub() {
     printf 'stub_name=%q\nstub_stdout=%q\n' "$name" "$stdout"
     cat <<'STUB'
 printf '%s %s\n' "$stub_name" "$*" >> "$TMP/calls.log"
+if [ "$stub_name" = sudo ] && [ "${1:-}" = -A ]; then shift; fi
 if [ -n "$stub_stdout" ]; then printf '%s\n' "$stub_stdout"; fi
 STUB
     printf 'exit %s\n' "$exit_code"

@@ -1,0 +1,9 @@
+# Conservative macOS 14+ stock lines. Uncertain stock code is kept for review.
+# System-wide profile for interactive zsh(1) shells.
+# Setup user specific overrides for this in ~/.zshrc. See zshbuiltins(1)
+# and zshoptions(1) for more details.
+HISTFILE=${ZDOTDIR:-$HOME}/.zsh_history
+HISTSIZE=2000
+SAVEHIST=1000
+setopt HIST_BEEP
+PS1="%n@%m %1~ %# "

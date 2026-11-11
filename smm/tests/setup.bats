@@ -55,6 +55,7 @@ fixture_steps() {
   SETUP_STEPS=(health finish)
   step_health_done() { return 1; }; step_health_run() { echo health >> "$TMP/calls.log"; }
   smm_need_restart defaults; smm_need_restart defaults
+  smm_has_tty() { return 0; }
   confirm() { return 0; }
   run cmd_setup; [ "$status" -eq 0 ]
   [ "$(calls | grep -c '^osascript ')" -eq 1 ]
@@ -70,6 +71,8 @@ fixture_steps() {
 }
 @test "skipped signin is degraded not failure and status shows it" {
   stub op 1; stub gh 1
+  export SMM_ANSWERS="$TMP/answers.json"
+  echo '{"signin.op":"skip","signin.gh":"skip"}' > "$SMM_ANSWERS"
   SETUP_STEPS=(signin finish)
   run cmd_setup; [ "$status" -eq 0 ]; [[ "$output" == *'1Password'*'GitHub'* ]]
   run cmd_status; [ "$status" -eq 0 ]; [[ "$output" == *degraded* ]]; [[ "$output" == *1Password* ]]; [[ "$output" == *GitHub* ]]
@@ -80,13 +83,13 @@ fixture_steps() {
 }
 @test "noninteractive missing permission opens exact pane and returns instructions" {
   stub aerospace 1
-  run smm_wait_permission aerospace; [ "$status" -eq 1 ]
+  run smm_wait_permission aerospace; [ "$status" -eq 3 ]
   calls | grep -Fq 'Privacy_Accessibility'
   [[ "$output" == *Accessibility* ]]
 }
 @test "Karabiner waits on driver and input monitoring panes" {
   stub systemextensionsctl 1
-  run smm_wait_permission karabiner; [ "$status" -eq 1 ]
+  run smm_wait_permission karabiner; [ "$status" -eq 3 ]
   calls | grep -Fq 'Privacy_ListenEvent'; calls | grep -Fq 'ExtensionItems'
 }
 @test "same configs backed up and retained until activation" {
@@ -158,7 +161,10 @@ if [ "$1" = uninstall ]; then grep -qx "brew sketchybar" "$SMM_STATE/deduped" ||
   echo '{}' > "$SMM_REPO/flake.lock"
   git -C "$SMM_REPO" add -A; git -C "$SMM_REPO" commit -qm fixture
   stub op 1; stub gh 1; stub pgrep 0; stub sketchybar 0 '{"items":[]}'
+  export SMM_ANSWERS="$TMP/answers.json"
+  echo '{"continue":"yes","signin.op":"skip","signin.gh":"skip","restart":"now"}' > "$SMM_ANSWERS"
   confirm() { return 0; }
+  smm_etc_entries() { echo '{}'; }
   smm_build() { mkdir -p "$TMP/build/sw/bin"; echo "$TMP/build" > "$SMM_STATE/last-build"; }
   smm_generation() { echo 42; }
   smm_switch() { smm_nix_inputs_hash > "$SMM_STATE/applied.hash"; }
@@ -186,6 +192,7 @@ case "$*" in\
   "read op://smm/weather/env") [ -f "$TMP/created" ] || exit 1; echo "weather_key=testvalue" ;;\
 esac\
 ' "$TMP/bin/op"
+  smm_has_tty() { return 0; }
   confirm() { return 0; }
   smm_setup_read_secret() { printf 'weather_key=testvalue\n' > "$1"; }
   run step_secrets_run; [ "$status" -eq 0 ]

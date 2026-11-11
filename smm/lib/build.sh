@@ -34,10 +34,12 @@ smm_build() (
   repo=$(smm_repo) || exit 1
   host=$(smm_host) || exit 1
   state=$(smm_state_dir) || exit 1
+  ref=$(smm_flake_ref) || exit 1
   cd "$repo" || exit 1
-  smm_rebuild build --flake "$repo#$host" || exit "$?"
+  smm_rebuild build --flake "$ref#$host" || exit "$?"
   result=$(cd -P result && pwd) || exit 1
-  printf '%s\n' "$result" > "$state/last-build"
+  printf '%s\n' "$result" > "$state/last-build" || exit 1
+  printf '%s\n' "$ref" > "$state/last-build-flake"
 )
 # Bootstrap nix-darwin before its executable is installed by first activation.
 smm_rebuild() {
@@ -53,7 +55,7 @@ smm_rebuild_sudo() {
   local generation
   if command -v darwin-rebuild >/dev/null 2>&1; then
     generation=$(smm_generation) || return 1
-    if [ -n "$generation" ]; then sudo darwin-rebuild "$@"; return "$?"; fi
+    if [ -n "$generation" ]; then smm_sudo darwin-rebuild "$@"; return "$?"; fi
   fi
   smm_nix --sudo run "$(smm_repo)#darwin-rebuild" -- "$@"
 }
@@ -68,10 +70,15 @@ smm_generation() {
   awk '/\(current\)/ && $1 ~ /^[0-9]+$/ { print $1; exit }' <<< "$generations"
 }
 smm_switch() {
-  local repo host
+  local repo host ref state
   repo=$(smm_repo) || return 1
   host=$(smm_host) || return 1
-  smm_rebuild_sudo switch --flake "$repo#$host"
+  ref=${SMM_FLAKE_REF:-$repo}
+  if [ "${SMM_AGENT_SETUP:-0}" = 1 ]; then
+    state=$(smm_state_dir) || return 1
+    ref=$(cat "$state/last-build-flake") || return 1
+  fi
+  smm_rebuild_sudo switch --flake "$ref#$host"
 }
 smm_rollback() {
   local state
@@ -92,3 +99,20 @@ smm_use_build_tools() {
   [ -d "$result/sw/bin" ] || { warn 'candidate build has no sw/bin'; return 1; }
   export PATH="$result/sw/bin:$PATH"
 }
+
+# Git flakes omit new generated modules. A path flake of the whole checkout
+# would include ignored secrets, so snapshot only tracked/nonignored files.
+smm_flake_ref() (
+  repo=$(smm_repo) || exit 1
+  if [ "${SMM_AGENT_SETUP:-0}" != 1 ]; then printf '%s\n' "${SMM_FLAKE_REF:-$repo}"; exit 0; fi
+  state=$(smm_state_dir) || exit 1
+  snapshot=$(mktemp -d "$state/flake.XXXXXX") || exit 1
+  git -C "$repo" ls-files --cached --others --exclude-standard -z > "$snapshot/files" || exit 1
+  while IFS= read -r -d '' file; do
+    smm_safe_relative "$file" || exit 1
+    [ -f "$repo/$file" ] || [ -L "$repo/$file" ] || continue
+    mkdir -p "$snapshot/source/$(dirname "$file")" || exit 1
+    cp -a "$repo/$file" "$snapshot/source/$file" || exit 1
+  done < "$snapshot/files"
+  printf 'path:%s/source\n' "$snapshot"
+)

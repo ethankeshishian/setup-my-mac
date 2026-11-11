@@ -113,6 +113,7 @@ if [ "$1" = switch ] && [ "$2" = --flake ]; then kill -TERM "$PPID"; fi\
   ! calls | grep -q '^aerospace '
 }
 @test "review 7 setup preview validates aerospace before dedupe and switch validates after activation" {
+  smm_has_tty() { return 0; }
   smm_migrate_preview() { :; }; confirm() { :; }
   smm_run_validate() { echo "validate $*" >> "$TMP/order"; }
   smm_use_build_tools() { :; }; smm_switch() { echo switch >> "$TMP/order"; }

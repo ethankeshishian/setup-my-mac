@@ -73,6 +73,15 @@ smm_brew_adopt_unmanaged() {
   unmanaged=$(smm_brew_unmanaged_casks) || return 1
   while IFS=$'\t' read -r cask app; do
     [ -n "$cask" ] || continue
+    if [ -n "${SMM_ANSWERS:-}" ] || [ "${SMM_AGENT_SETUP:-0}" = 1 ]; then
+      answer=$(smm_answer "unmanaged.$cask" "$app is installed outside Homebrew" adopt replace stop) || return "$?"
+      case "$answer" in
+        adopt) HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask --adopt "$cask" || return 1 ;;
+        replace) HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask --force "$cask" || return 1 ;;
+        stop) warn "Stopped before taking over $app; review answers and rerun setup."; return 1 ;;
+      esac
+      continue
+    fi
     # --adopt takes over the existing app; it refuses one whose version differs
     # unless the cask auto-updates.
     HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask --adopt "$cask" && continue
@@ -96,10 +105,13 @@ smm_brew_resolve() {
   fi
   [ -n "$packages" ] || return 0
   if [ "${1:-}" = --list-only ]; then printf '%s\n' "$packages"; return 0; fi
-  if ! smm_brew_interactive; then warn "undeclared Homebrew packages (unchanged):
+  if [ -z "${SMM_ANSWERS:-}" ] && [ "${SMM_AGENT_SETUP:-0}" != 1 ] && ! smm_brew_interactive; then warn "undeclared Homebrew packages (unchanged):
 $packages"; return 0; fi
   while IFS=' ' read -r kind name; do
-    answer=$(choose "$kind $name is installed but not in your setup" 'add to setup' remove skip) || return 1
+    if [ -n "${SMM_ANSWERS:-}" ] || [ "${SMM_AGENT_SETUP:-0}" = 1 ]; then
+      answer=$(smm_answer "brew.$kind.$name" "$kind $name is installed but not in your setup" add remove skip) || return "$?"
+      [ "$answer" != add ] || answer='add to setup'
+    else answer=$(choose "$kind $name is installed but not in your setup" 'add to setup' remove skip) || return 1; fi
     case "$answer" in
       'add to setup') smm_brew_add "$kind" "$name" || return 1 ;;
       remove)
@@ -112,4 +124,12 @@ $packages"; return 0; fi
       *) return 1 ;;
     esac
   done <<< "$packages"
+}
+
+# Read-only version check for safe --plan defaults. Unknown is never adoption.
+smm_cask_versions_match() {
+  local cask=$1 app=$2 expected installed
+  expected=$(HOMEBREW_NO_AUTO_UPDATE=1 brew info --cask --json=v2 "$cask" | jq -er '.casks[0].version | split(",")[0]') || return 1
+  installed=$(plutil -extract CFBundleShortVersionString raw -o - "${SMM_APPLICATIONS_DIR:-/Applications}/$app/Contents/Info.plist") || return 1
+  [ "$expected" = "$installed" ]
 }

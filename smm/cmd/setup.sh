@@ -3,10 +3,18 @@
 cmd_setup() (
   case "${1:-}" in
     --preview) [ "$#" -eq 1 ] || exit 2; smm_migrate_preview; exit "$?" ;;
+    --plan)
+      [ "$#" -le 2 ] || exit 2
+      smm_setup_plan "${2:-$HOME/Desktop/smm-answers.json}"; exit "$?" ;;
+    --answers)
+      [ "$#" -eq 2 ] && [ -f "$2" ] || { warn 'usage: smm setup --answers <file>'; exit 2; }
+      SMM_ANSWERS="$(cd -P "$(dirname "$2")" && pwd)/$(basename "$2")" || exit 1
+      export SMM_ANSWERS
+      jq -e 'type == "object"' "$SMM_ANSWERS" >/dev/null || { warn 'invalid answers file'; exit 1; } ;;
     '') ;;
-    *) warn 'usage: smm setup [--preview]'; exit 2 ;;
+    *) warn 'usage: smm setup [--preview | --plan [file] | --answers file]'; exit 2 ;;
   esac
-  export SMM_SETUP_ORIGINAL_PATH="$PATH"
+  export SMM_SETUP_ORIGINAL_PATH="$PATH" SMM_AGENT_SETUP=1
   declare -p SETUP_STEPS >/dev/null 2>&1 || smm_setup_steps
   state=$(smm_state_dir) || exit 1
   smm_tx_begin setup || exit 1
@@ -49,7 +57,7 @@ cmd_setup() (
     else
       reason=$(tail -n 1 "$state/setup.log")
       warn "setup stopped at $step: ${reason:-step failed}. Fix it and run smm setup again."
-      exit 1
+      exit "$result"
     fi
   done
   # Nothing is finalized until every step has succeeded.
