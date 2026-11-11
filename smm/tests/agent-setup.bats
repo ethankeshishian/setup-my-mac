@@ -41,6 +41,31 @@ setup() {
   echo '{"continue":"yes"}' > "$SMM_ANSWERS"
   run cmd_setup --answers "$SMM_ANSWERS"; [ "$status" -eq 0 ]; [ -f "$TMP/completed" ]
 }
+@test "a pause after activation keeps the switch and resumes the same journal" {
+  SETUP_STEPS=(switched wait)
+  step_switched_done() { [ -f "$TMP/switched" ]; }
+  step_switched_run() { echo 7 > "$SMM_STATE/setup-generation"; smm_tx_watch "$HOME/.zshrc" target; touch "$TMP/switched"; }
+  step_wait_done() { [ -f "$TMP/waited" ]; }
+  step_wait_run() { smm_answer continue 'Continue?' yes no >/dev/null || return "$?"; touch "$TMP/waited"; }
+  smm_setup_recover() { echo recover >> "$TMP/calls.log"; }
+  smm_finalize_apply() { :; }
+  run cmd_setup --answers "$SMM_ANSWERS"; [ "$status" -eq 3 ]
+  [[ "$output" == *'setup paused at wait'* ]] || return 1
+  ! calls | grep -qx recover || return 1
+  [ -f "$SMM_STATE/setup.transaction/paused" ]
+  [ "$(cat "$SMM_STATE/setup-generation")" = 7 ]
+  echo '{"continue":"yes"}' > "$SMM_ANSWERS"
+  run cmd_setup --answers "$SMM_ANSWERS"; [ "$status" -eq 0 ]
+  [ -f "$TMP/waited" ]; [ ! -e "$SMM_STATE/setup.transaction" ]
+  ! calls | grep -qx recover || return 1
+}
+@test "a real failure still recovers" {
+  SETUP_STEPS=(broken)
+  step_broken_done() { return 1; }; step_broken_run() { return 1; }
+  smm_setup_recover() { echo recover >> "$TMP/calls.log"; }
+  run cmd_setup --answers "$SMM_ANSWERS"; [ "$status" -eq 1 ]
+  calls | grep -qx recover; [ ! -e "$SMM_STATE/setup.transaction" ]
+}
 @test "plan inventories questions with safe defaults without changing repo or calling mutations" {
   echo '[{"name":"old"},{"name":"mine"},{"name":"both"}]' > "$SMM_REPO/manifest/links.json"
   smm_migrate_status() { case "$1" in old) echo repo-newer ;; mine) echo local-newer ;; both) echo both-changed ;; esac; }

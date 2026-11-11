@@ -22,6 +22,7 @@ Paste this to the agent on the Mac being migrated:
 > `~/.local/state/smm/setup.log` until the process exits. Never let a tool timeout
 > kill setup: timeouts send TERM mid-step, potentially during installation or
 > activation. Rerun only after the previous process has exited.
+> Exit code 3 pauses setup without rolling anything back; rerunning resumes it.
 > On exit code 3, read the `SMM-NEEDS:` lines in the output or
 > `~/.local/state/smm/needs.log`. Relay requested user actions to Ethan verbatim.
 > `SMM-WAITING:` means setup is polling for up to ten minutes while Ethan acts.

@@ -18,11 +18,14 @@ cmd_setup() (
   declare -p SETUP_STEPS >/dev/null 2>&1 || smm_setup_steps
   state=$(smm_state_dir) || exit 1
   smm_tx_begin setup || exit 1
-  complete=0 logger=''
+  complete=0 paused=0 logger=''
   # shellcheck disable=SC2329
   smm_setup_cleanup() {
     local recovered=0
-    if [ "$complete" -eq 0 ]; then smm_setup_recover || recovered=1; fi
+    # Exit 3 waits for an answer or a user action (SMM-NEEDS). Keep everything,
+    # including an activated system, and resume from the same journal on rerun.
+    if [ "$paused" -eq 1 ]; then touch "$SMM_TX/paused" || recovered=1
+    elif [ "$complete" -eq 0 ]; then smm_setup_recover || recovered=1; fi
     if [ -n "$logger" ]; then
       # A signal can land while this shell still writes into the FIFO, so tee
       # would never see EOF. Let go of the FIFO, then wait briefly for tee.
@@ -34,7 +37,7 @@ cmd_setup() (
       kill "$logger" 2>/dev/null || :
       wait "$logger" 2>/dev/null || :
     fi
-    [ "$recovered" -ne 0 ] || rm -rf "$SMM_TX"
+    [ "$recovered" -ne 0 ] || [ "$paused" -eq 1 ] || rm -rf "$SMM_TX"
   }
   trap smm_setup_cleanup EXIT
   trap 'exit 130' INT
@@ -56,7 +59,12 @@ cmd_setup() (
       printf '%s done\n' "$step" >> "$state/setup.log"
     else
       reason=$(tail -n 1 "$state/setup.log")
-      warn "setup stopped at $step: ${reason:-step failed}. Fix it and run smm setup again."
+      if [ "$result" -eq 3 ]; then
+        paused=1
+        warn "setup paused at $step: ${reason:-waiting}. Changes so far are kept; provide it and run smm setup again to resume."
+      else
+        warn "setup stopped at $step: ${reason:-step failed}. Fix it and run smm setup again."
+      fi
       exit "$result"
     fi
   done
@@ -64,6 +72,6 @@ cmd_setup() (
   if [ -f "$state/setup-generation" ]; then smm_finalize_apply || exit 1; fi
   rm -f "$state/setup-generation"
   : > "$state/deduped"
-  rm -f "$state/deduped-services"
+  rm -f "$state/deduped-services" "$state/deduped-taps"
   complete=1
 )

@@ -4,6 +4,8 @@
 # journal in state makes an interrupted recovery inspectable and retryable.
 smm_tx_begin() {
   SMM_TX="$(smm_state_dir)/$1.transaction"
+  # A run paused for an answer or user action resumes its own journal.
+  if [ -f "$SMM_TX/paused" ]; then rm -f "$SMM_TX/paused" || return 1; export SMM_TX; return 0; fi
   mkdir "$SMM_TX" || { warn "recover existing transaction first: $SMM_TX"; return 1; }
   export SMM_TX
 }

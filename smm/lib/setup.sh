@@ -340,16 +340,20 @@ step_dedupe_done() {
 # Cask token -> the app name macOS knows it by.
 smm_cask_app() { case "$1" in alt-tab) echo AltTab ;; aerospace) echo AeroSpace ;; *) echo "$1" ;; esac; }
 step_dedupe_run() {
-  local duplicates kind name file services
+  local duplicates kind name file services taps full
   duplicates=$(smm_brew_duplicates) || return 1
   file="$(smm_state_dir)/deduped"
   services="$(smm_state_dir)/deduped-services"
+  taps="$(smm_state_dir)/deduped-taps"
   while IFS=' ' read -r kind name; do
     [ -n "$name" ] || continue
     # Journal before stopping anything so interruption is recoverable.
     if [ ! -f "$file" ] || ! grep -Fxq "$kind $name" "$file"; then printf '%s %s\n' "$kind" "$name" >> "$file"; fi
     case "$kind" in
       brew)
+        # Third-party tap formulae need an explicit trust to be reinstalled.
+        full=$(brew list --full-name --formula 2>/dev/null | grep -E "^[^/]+/[^/]+/$name\$" | head -n 1) || full=''
+        if [ -n "$full" ] && ! grep -Fxqs "$name $full" "$taps"; then printf '%s %s\n' "$name" "$full" >> "$taps"; fi
         # Recovery restarts only services that were running before.
         if brew services list 2>/dev/null | awk -v name="$name" '$1 == name && $2 == "started" { found=1 } END { exit !found }' &&
           ! grep -Fxqs "$name" "$services"; then
@@ -364,23 +368,29 @@ step_dedupe_run() {
   done <<< "$duplicates"
 }
 smm_setup_restore_brew() {
-  local file services kind name failed=0
+  local file services taps kind name full failed=0
   file="$(smm_state_dir)/deduped"
   services="$(smm_state_dir)/deduped-services"
+  taps="$(smm_state_dir)/deduped-taps"
   [ -s "$file" ] || return 0
   while IFS=' ' read -r kind name; do
     case "$kind" in
       brew)
-        # These were installed before setup removed them. Homebrew now refuses
-        # untrusted third-party taps (e.g. felixkratz/formulae/borders) by default.
-        HOMEBREW_NO_REQUIRE_TAP_TRUST=1 brew install "$name" || { failed=1; continue; }
+        # These were installed before setup removed them. Homebrew refuses
+        # formulae from untrusted taps (e.g. felixkratz/formulae/borders), so
+        # trust exactly the formula that was installed, then reinstall it.
+        full=$(awk -v name="$name" '$1 == name { print $2; exit }' "$taps" 2>/dev/null) || full=''
+        if [ -n "$full" ]; then
+          brew trust --formula "$full" || :
+          brew install "$full" || { failed=1; continue; }
+        else brew install "$name" || { failed=1; continue; }; fi
         if grep -Fxqs "$name" "$services"; then brew services start "$name" || failed=1; fi ;;
       cask)
         brew install --cask "$name" && open -a "$(smm_cask_app "$name")" || failed=1 ;;
       *) failed=1 ;;
     esac
   done < "$file"
-  [ "$failed" -ne 0 ] || { : > "$file"; rm -f "$services"; }
+  [ "$failed" -ne 0 ] || { : > "$file"; rm -f "$services" "$taps"; }
   return "$failed"
 }
 smm_setup_recover() {
@@ -423,9 +433,14 @@ step_switch_run() {
   prev=$(smm_generation) || return 1
   printf '%s\n' "$prev" > "$state/setup-generation" || return 1
   if [ -n "${SMM_TX:-}" ]; then
-    smm_tx_arm "$state/applied.hash" && smm_tx_clear_targets || return 1
+    smm_tx_arm "$state/applied.hash" || return 1
+    smm_setup_journal_hm_conflicts || return 1
+    smm_tx_clear_targets || return 1
   fi
   if ! smm_switch; then smm_setup_recover || warn 'recovery incomplete'; return 1; fi
+  # A running AeroSpace keeps its old config (e.g. its workspace list) until
+  # reloaded; SketchyBar reads that list when its agent restarts below.
+  smm_reload aerospace || warn 'AeroSpace did not reload its config; run aerospace reload-config'
   smm_restart_nix_agents
   smm_validate_prefs "$(smm_repo)" || return 1
   # The system is already active; an app refusing to quit (Raycast answers
@@ -436,6 +451,38 @@ step_switch_run() {
   smm_need_restart 'macOS menu bar and symbolic hotkey defaults' || return 1
 }
 
+# home-manager refuses to replace real files with its links (e.g. a git clone
+# at ~/.config/tmux/plugins/catppuccin/tmux). Journal every conflicting target in
+# the candidate generation, including ones outside the link manifest, so the
+# switch moves them aside and recovery puts them back. Setup's backup keeps a copy.
+smm_setup_hm_files() {
+  local state build
+  state=$(smm_state_dir) || return 1
+  [ -f "$state/last-build" ] || return 0
+  build=$(cat "$state/last-build") || return 1
+  smm_nix path-info --recursive "$build" 2>/dev/null | grep -E -- '-home-manager-files$' | head -n 1
+}
+smm_setup_journal_hm_conflicts() {
+  local files rel target backup='' managed name
+  # Unknown generation contents: home-manager itself still refuses to clobber.
+  files=$(smm_setup_hm_files) || files=""
+  [ -n "$files" ] && [ -d "$files" ] || return 0
+  # Manifest links are journaled and backed up by the configs and switch steps.
+  managed=$(link_names | while IFS= read -r name; do [ -z "$name" ] || link_field "$name" target; done) || return 1
+  while IFS= read -r -d '' rel; do
+    rel=${rel#./}
+    smm_safe_relative "$rel" || continue
+    ! grep -Fxq -- "$rel" <<< "$managed" || continue
+    target="$HOME/$rel"
+    if [ -e "$target" ] && [ ! -L "$target" ]; then
+      [ -n "$backup" ] || backup=$(smm_backup_dir) || return 1
+      log "moving aside for home-manager: ~/$rel (copy in $backup)"
+      mkdir -p "$backup/$(dirname "$rel")" || return 1
+      [ -e "$backup/$rel" ] || cp -a "$target" "$backup/$rel" || return 1
+      smm_tx_watch "$target" target || return 1
+    fi
+  done < <(cd "$files" && find . \( -type f -o -type l \) -print0)
+}
 # AeroSpace, not brew services, used to start Homebrew's SketchyBar and borders,
 # so they keep running after dedupe removes them. Each allows one instance, so
 # the Nix launchd agents exit and health would query the old bar and config.

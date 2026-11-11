@@ -291,17 +291,20 @@ esac\
   sed_inplace '/exit 0/i\
 case "$*" in\
   "services list") printf "Name Status User File\\nsketchybar started me x\\nfd none\\n" ;;\
-  "install "*) [ "${HOMEBREW_NO_REQUIRE_TAP_TRUST:-}" = 1 ] || exit 97 ;;\
+  "list --full-name --formula") printf "fd\\nfelixkratz/formulae/sketchybar\\n" ;;\
+  "install felixkratz/formulae/sketchybar") grep -qx "brew trust --formula felixkratz/formulae/sketchybar" "$TMP/calls.log" || exit 97 ;;\
   "services start fd") exit 1 ;;\
 esac\
 ' "$TMP/bin/brew"
   run step_dedupe_run; [ "$status" -eq 0 ]
   [ "$(cat "$SMM_STATE/deduped-services")" = sketchybar ]
+  [ "$(cat "$SMM_STATE/deduped-taps")" = 'sketchybar felixkratz/formulae/sketchybar' ]
   run smm_setup_restore_brew; [ "$status" -eq 0 ]
-  calls | grep -qx 'brew install sketchybar'; calls | grep -qx 'brew install fd'
+  calls | grep -qx 'brew install felixkratz/formulae/sketchybar'; calls | grep -qx 'brew install fd'
+  ! calls | grep -qx 'brew trust --formula fd' || return 1
   calls | grep -qx 'brew services start sketchybar'
   ! calls | grep -qx 'brew services start fd' || return 1
-  [ ! -s "$SMM_STATE/deduped" ]; [ ! -e "$SMM_STATE/deduped-services" ]
+  [ ! -s "$SMM_STATE/deduped" ]; [ ! -e "$SMM_STATE/deduped-services" ]; [ ! -e "$SMM_STATE/deduped-taps" ]
 }
 @test "switch keeps the activated system when an app refuses to restart" {
   smm_use_build_tools() { :; }; smm_run_validate() { return 0; }
@@ -328,4 +331,32 @@ case "$*" in *101*) echo sketchybar ;; *202*) echo /opt/homebrew/bin/borders ;; 
   ! calls | grep -qx 'kill 303' || return 1
   calls | grep -q "launchctl kickstart -k gui/$UID/org.nixos.sketchybar"
   calls | grep -q "launchctl kickstart -k gui/$UID/org.nixos.jankyborders"
+}
+@test "switch reloads AeroSpace before restarting the Nix agents" {
+  smm_use_build_tools() { :; }; smm_run_validate() { return 0; }
+  smm_switch() { :; }; smm_validate_prefs() { :; }; smm_prefs_relaunch() { :; }
+  smm_reload() { echo "reload $*" >> "$TMP/calls.log"; }
+  smm_restart_nix_agents() { echo agents >> "$TMP/calls.log"; }
+  run step_switch_run; [ "$status" -eq 0 ]
+  [ "$(grep -nx 'reload aerospace' "$TMP/calls.log" | cut -d: -f1)" -lt "$(grep -nx agents "$TMP/calls.log" | cut -d: -f1)" ]
+}
+@test "home-manager conflicts outside the link manifest are moved aside and restored on recovery" {
+  echo '[{"name":"zsh","source":"config/zshrc","target":".zshrc","type":"file"}]' > "$SMM_REPO/manifest/links.json"
+  mkdir -p "$TMP/hm/.config/tmux/plugins/catppuccin" "$TMP/hm/.config/kitty"
+  ln -s /nix/store/x-catppuccin "$TMP/hm/.config/tmux/plugins/catppuccin/tmux"
+  ln -s /nix/store/x-kitty "$TMP/hm/.config/kitty/kitty.conf"
+  ln -s /nix/store/x-zshrc "$TMP/hm/.zshrc"
+  smm_setup_hm_files() { echo "$TMP/hm"; }
+  mkdir -p "$HOME/.config/tmux/plugins/catppuccin/tmux"; echo clone > "$HOME/.config/tmux/plugins/catppuccin/tmux/README"
+  echo mine > "$HOME/.zshrc"
+  export SMM_BACKUP="$TMP/backup"
+  smm_tx_begin setup
+  run smm_setup_journal_hm_conflicts; [ "$status" -eq 0 ]
+  [[ "$output" == *'.config/tmux/plugins/catppuccin/tmux'* ]] || return 1
+  [[ "$output" != *'.zshrc'* ]] || return 1
+  [ "$(cat "$TMP/backup/.config/tmux/plugins/catppuccin/tmux/README")" = clone ]
+  smm_tx_clear_targets
+  [ ! -e "$HOME/.config/tmux/plugins/catppuccin/tmux" ]; [ "$(cat "$HOME/.zshrc")" = mine ]
+  smm_tx_restore
+  [ "$(cat "$HOME/.config/tmux/plugins/catppuccin/tmux/README")" = clone ]
 }
