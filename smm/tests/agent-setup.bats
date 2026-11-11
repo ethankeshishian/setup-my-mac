@@ -137,7 +137,7 @@ printf '%s\n' "$SUDO_ASKPASS" > "$TMP/askpass-path"
 INSTALLER
   run smm_installer_run "$TMP/installer" install
   [ "$status" -eq 0 ]; calls | grep -qx 'sudo -A echo installer'
-  [ "$(cat "$TMP/askpass-path")" = "$REPO/smm/libexec/askpass" ]
+  [ "$(cat "$TMP/askpass-path")" = "$(cd -P "$REPO" && pwd)/smm/libexec/askpass" ]
 }
 @test "invalid secret confirmation is a hard error and never fetches a value" {
   echo '[{"name":"weather","op_ref":"op://smm/weather/env","target":"weather.env.sh"}]' > "$SMM_REPO/manifest/secrets.json"
@@ -191,4 +191,73 @@ esac\
   calls | grep -qx 'gh auth login --web'
   [[ "$output" == *'SMM-NEEDS: user gh: First copy your one-time code: ABCD-EFGH'* ]]
   grep -Fq 'ABCD-EFGH' "$SMM_STATE/needs.log"
+}
+
+@test "signed out plan defers secret inventory until sign-in" {
+  echo '[{"name":"weather","op_ref":"op://smm/weather/env","target":"weather.env.sh"}]' > "$SMM_REPO/manifest/secrets.json"
+  stub op 1
+  run cmd_setup --plan "$TMP/plan.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'checked after 1Password sign-in'* ]] || return 1
+  jq -e '[.questions[] | select(.key | startswith("secret."))] == []' "$TMP/plan.json"
+  ! calls | grep -q '^op item get '
+}
+@test "signed in plan asks to create a missing secret item" {
+  echo '[{"name":"weather","op_ref":"op://smm/weather/env","target":"weather.env.sh"}]' > "$SMM_REPO/manifest/secrets.json"
+  stub op 0
+  sed_inplace '/exit 0/i\
+[ "$1 $2" != "item get" ] || exit 1\
+' "$TMP/bin/op"
+  run cmd_setup --plan "$TMP/plan.json"
+  [ "$status" -eq 0 ]
+  jq -e 'any(.questions[]; .key == "secret.weather.create")' "$TMP/plan.json"
+}
+@test "plan lists accepted etc entries without asking again and review includes them" {
+  echo 'export WORK=preserve' > "$SMM_ETC_ROOT/zshenv"
+  smm_etc_entries() { echo '{"zshenv":{"enable":true,"target":"zshenv","knownSha256Hashes":[]}}'; }
+  echo '{"etc.zshenv":"accept"}' > "$SMM_ANSWERS"
+  step_build_run() { :; }
+  step_etc_run
+  run cmd_setup --plan "$TMP/plan.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'already accepted in hosts/etc/Test-Mac.nix: zshenv'* ]] || return 1
+  jq -e 'all(.questions[]; .key != "etc.zshenv")' "$TMP/plan.json"
+  before=$(shasum "$SMM_REPO/hosts/etc/Test-Mac.nix" "$SMM_ETC_ROOT/zshenv")
+  run cmd_etc review
+  [ "$status" -eq 0 ]
+  [[ "$output" == *KEEP*WORK=preserve* ]] || return 1
+  [ "$before" = "$(shasum "$SMM_REPO/hosts/etc/Test-Mac.nix" "$SMM_ETC_ROOT/zshenv")" ]
+}
+@test "plan and preview list missing declared Homebrew packages with password notice" {
+  stub brew 0
+  echo '{"taps":[],"brews":["tpm"],"casks":["logi-options+"]}' > "$SMM_REPO/manifest/homebrew.json"
+  run cmd_setup --plan "$TMP/plan.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'brew tpm'*'cask logi-options+'*'password dialog may appear'* ]] || return 1
+  run cmd_setup --preview
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'brew tpm'*'cask logi-options+'*'password dialog may appear'* ]] || return 1
+  ! calls | grep -q '^brew bundle install '
+}
+@test "plan pre-fills adoption for auto-updating unmanaged casks with different versions" {
+  smm_brew_unmanaged_casks() { printf 'arc\tArc.app\n'; }
+  stub brew 0 '{"casks":[{"version":"2.0","auto_updates":true}]}'
+  stub plutil 0 9.0
+  run cmd_setup --plan "$TMP/plan.json"
+  [ "$status" -eq 0 ]
+  jq -e '.questions[] | select(.key == "unmanaged.arc") | .value == "adopt" and (.allowed | index("replace") != null)' "$TMP/plan.json"
+}
+@test "plan lists accepted entries after activation links etc into static" {
+  echo 'export WORK=preserve' > "$SMM_ETC_ROOT/zshenv"
+  smm_etc_entries() { echo '{"zshenv":{"enable":true,"target":"zshenv","knownSha256Hashes":[]}}'; }
+  echo '{"etc.zshenv":"accept"}' > "$SMM_ANSWERS"
+  step_build_run() { :; }
+  step_etc_run
+  mkdir "$SMM_ETC_ROOT/static"
+  mv "$SMM_ETC_ROOT/zshenv" "$SMM_ETC_ROOT/static/zshenv"
+  ln -s static/zshenv "$SMM_ETC_ROOT/zshenv"
+  run cmd_setup --plan "$TMP/plan.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'already accepted in hosts/etc/Test-Mac.nix: zshenv'* ]] || return 1
+  jq -e 'all(.questions[]; .key != "etc.zshenv")' "$TMP/plan.json"
 }

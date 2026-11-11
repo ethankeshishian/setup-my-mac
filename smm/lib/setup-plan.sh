@@ -15,6 +15,9 @@ smm_setup_plan() (
   # Inventory helpers may create transient state (e.g. a Brewfile).
   export SMM_STATE="$tmp/state" SMM_AGENT_SETUP=1 SMM_PLAN=1
   host=$(smm_host) || exit 1
+  smm_brew_missing_preview || exit 1
+  signed_in=0
+  op whoami >/dev/null 2>&1 && signed_in=1
   {
     if ! step_host_done; then
       smm_plan_question host.name 'Host name:' "$host" '' text
@@ -52,6 +55,7 @@ smm_setup_plan() (
       smm_etc_entries() { printf '%s\n' '{"zshrc":{"target":"zshrc","enable":true,"knownSha256Hashes":[]},"zshenv":{"target":"zshenv","enable":true,"knownSha256Hashes":[]},"bashrc":{"target":"bashrc","enable":true,"knownSha256Hashes":[]}}'; }
       warn 'Nix is absent: /etc plan covers standard shell files; rerun --plan after the first build for any additional managed entries.'
     fi
+    smm_etc_accepted_report >&2 || exit 1
     entries=$(smm_etc_pending) || exit 1
     while IFS= read -r entry; do
       [ -n "$entry" ] || continue
@@ -63,7 +67,7 @@ smm_setup_plan() (
         smm_plan_question "user.$app" "Grant $app permissions in System Settings" 'done' '' 'done'
       fi
     done
-    if ! op whoami >/dev/null 2>&1; then
+    if [ "$signed_in" -eq 0 ]; then
       smm_plan_question signin.op 'Sign in to 1Password now?' now '' now skip
       smm_plan_question user.op 'Unlock/sign in to 1Password and enable CLI integration' 'done' '' 'done'
     fi
@@ -79,6 +83,10 @@ smm_setup_plan() (
       [ -n "$entry" ] || continue
       target=$(jq -r .target <<< "$entry"); name=$(jq -r .name <<< "$entry"); ref=$(jq -r .op_ref <<< "$entry")
       [ ! -f "$HOME/$target" ] || continue
+      if [ "$signed_in" -eq 0 ]; then
+        warn "$name: checked after 1Password sign-in"
+        continue
+      fi
       path=${ref#op://}; vault=${path%%/*}; path=${path#*/}; item=${path%%/*}
       if ! op item get "$item" --vault "$vault" --format json >/dev/null 2>&1; then
         smm_plan_question "secret.$name.create" "Create missing 1Password item $vault/$item for $name?" no '' yes no

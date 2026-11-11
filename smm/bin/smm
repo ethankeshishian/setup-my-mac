@@ -25,9 +25,9 @@ done
 case "${1:---help}" in
   --help|-h)
     printf '%s\n' 'Usage: smm [-y] <command> [args]' \
-      'Commands: setup apply sync add remove status upgrade undo validate capture raycast'
+      'Commands: setup apply sync add remove status upgrade undo validate capture raycast etc'
     ;;
-  setup|apply|sync|add|remove|status|upgrade|undo|validate|capture|raycast)
+  setup|apply|sync|add|remove|status|upgrade|undo|validate|capture|raycast|etc)
     smm_command="cmd_$1"
     shift
     if declare -F "$smm_command" >/dev/null; then

@@ -312,11 +312,13 @@ step_brew_adopt_run() {
   smm_setup_prune_duplicates && smm_brew_resolve
 }
 step_brew_existing_done() {
-  local unmanaged
+  local unmanaged missing
+  missing=$(smm_brew_missing) || return 1
+  [ -z "$missing" ] || return 1
   unmanaged=$(smm_brew_unmanaged_casks) || return 1
   [ -z "$unmanaged" ]
 }
-step_brew_existing_run() { smm_brew_adopt_unmanaged; }
+step_brew_existing_run() { smm_brew_adopt_unmanaged && smm_brew_install_missing; }
 step_build_done() {
   local state hash path
   state=$(smm_state_dir) || return 1

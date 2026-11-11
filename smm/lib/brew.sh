@@ -76,15 +76,15 @@ smm_brew_adopt_unmanaged() {
     if [ -n "${SMM_ANSWERS:-}" ] || [ "${SMM_AGENT_SETUP:-0}" = 1 ]; then
       answer=$(smm_answer "unmanaged.$cask" "$app is installed outside Homebrew" adopt replace stop) || return "$?"
       case "$answer" in
-        adopt) HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask --adopt "$cask" || return 1 ;;
-        replace) HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask --force "$cask" || return 1 ;;
+        adopt) smm_brew_user install --cask --adopt "$cask" || return 1 ;;
+        replace) smm_brew_user install --cask --force "$cask" || return 1 ;;
         stop) warn "Stopped before taking over $app; review answers and rerun setup."; return 1 ;;
       esac
       continue
     fi
     # --adopt takes over the existing app; it refuses one whose version differs
     # unless the cask auto-updates.
-    HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask --adopt "$cask" && continue
+    smm_brew_user install --cask --adopt "$cask" && continue
     answer=''
     if smm_brew_interactive; then
       answer=$(choose "$app is installed outside Homebrew and differs from the $cask cask" \
@@ -94,7 +94,7 @@ smm_brew_adopt_unmanaged() {
       warn "$app differs from the $cask cask. Run brew install --cask --force $cask, or remove $cask from manifest/homebrew.json, then rerun setup."
       return 1
     fi
-    HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask --force "$cask" || return 1
+    smm_brew_user install --cask --force "$cask" || return 1
   done <<< "$unmanaged"
 }
 smm_brew_resolve() {
@@ -126,10 +126,64 @@ $packages"; return 0; fi
   done <<< "$packages"
 }
 
-# Read-only version check for safe --plan defaults. Unknown is never adoption.
+# Read-only adoption check. Auto-updating casks tolerate differing versions.
 smm_cask_versions_match() {
-  local cask=$1 app=$2 expected installed
-  expected=$(HOMEBREW_NO_AUTO_UPDATE=1 brew info --cask --json=v2 "$cask" | jq -er '.casks[0].version | split(",")[0]') || return 1
+  local cask=$1 app=$2 expected installed metadata
+  metadata=$(HOMEBREW_NO_AUTO_UPDATE=1 brew info --cask --json=v2 "$cask") || return 1
+  jq -e '.casks[0].auto_updates == true' <<< "$metadata" >/dev/null && return 0
+  expected=$(jq -er '.casks[0].version | split(",")[0]' <<< "$metadata") || return 1
   installed=$(plutil -extract CFBundleShortVersionString raw -o - "${SMM_APPLICATIONS_DIR:-/Applications}/$app/Contents/Info.plist") || return 1
   [ "$expected" = "$installed" ]
+}
+
+# Inventory only names: installed versions stay untouched by --no-upgrade.
+smm_brew_missing() {
+  local kind declared installed name short
+  for kind in brew cask; do
+    declared=$(jq -r --arg kind "$kind" 'if $kind == "brew" then .brews[] else .casks[] end' "$(smm_repo)/manifest/homebrew.json") || return 1
+    [ -n "$declared" ] || continue
+    installed=''
+    if command -v brew >/dev/null 2>&1; then
+      case "$kind" in
+        brew) installed=$(HOMEBREW_NO_AUTO_UPDATE=1 brew list --formula) || return 1 ;;
+        cask) installed=$(HOMEBREW_NO_AUTO_UPDATE=1 brew list --cask) || return 1 ;;
+      esac
+    fi
+    while IFS= read -r name; do
+      [ -n "$name" ] || continue
+      short=${name##*/}
+      if ! grep -Fxq -- "$short" <<< "$installed" && ! grep -Fxq -- "$name" <<< "$installed"; then
+        printf '%s %s\n' "$kind" "$name"
+      fi
+    done <<< "$declared"
+  done
+}
+# Run Homebrew as the invoking user. Its installer/pkg artifacts use sudo -A
+# when SUDO_ASKPASS is set; activation's nested sudo would discard this variable.
+smm_brew_user() (
+  if ! smm_has_tty; then
+    SUDO_ASKPASS="$(smm_resource_root)/libexec/askpass" || exit 1
+    export SUDO_ASKPASS
+  fi
+  export HOMEBREW_NO_AUTO_UPDATE=1
+  brew "$@"
+)
+smm_brew_install_missing() {
+  local missing file
+  missing=$(smm_brew_missing) || return 1
+  [ -n "$missing" ] || return 0
+  command -v brew >/dev/null 2>&1 || { warn 'Homebrew is required to preinstall declared packages before activation'; return 1; }
+  log "Installing declared Homebrew packages before activation:
+$missing"
+  log 'A password dialog may appear for installer/pkg casks.'
+  file=$(smm_brewfile) || return 1
+  smm_brew_user bundle install "--file=$file" --no-upgrade
+}
+smm_brew_missing_preview() {
+  local missing
+  missing=$(smm_brew_missing) || return 1
+  [ -n "$missing" ] || return 0
+  log "Declared Homebrew packages to install before activation:
+$missing"
+  log 'A password dialog may appear for installer/pkg casks.'
 }

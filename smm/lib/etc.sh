@@ -118,3 +118,36 @@ step_etc_run() (
   module_tmp=''
   step_build_run
 )
+
+smm_etc_accepted_report() {
+  local names host generated
+  host=$(smm_host) || return 1
+  generated="$(smm_repo)/hosts/etc/$host.nix"
+  [ -f "$generated" ] || return 0
+  # The accepted original hashes remain useful after activation changes the
+  # content and replaces files with /etc/static symlinks. Report the saved names.
+  names=$(sed -n 's/^    # smm-accepted \(.*\) [0-9a-f]\{64\}$/\1/p' "$generated" | jq -sr 'unique | join(" ")') || return 1
+  [ -n "$names" ] || return 0
+  log "already accepted in hosts/etc/$host.nix: $names"
+}
+# Read-only classifier output includes known hashes and accepted files too.
+smm_etc_review() (
+  tmp=$(mktemp -d) || exit 1
+  trap 'rm -rf "$tmp"' EXIT
+  export SMM_STATE="$tmp/state" SMM_PLAN=1 SMM_AGENT_SETUP=0
+  entries=$(smm_etc_entries) || exit 1
+  jq -e 'type == "object"' <<< "$entries" >/dev/null || exit 1
+  names=$(jq -r 'keys[]' <<< "$entries") || exit 1
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    entry=$(jq -c --arg name "$name" '.[$name]' <<< "$entries") || exit 1
+    [ "$(jq -r .enable <<< "$entry")" = true ] || continue
+    target=$(jq -er .target <<< "$entry") || exit 1
+    smm_safe_relative "$target" || { warn "unsafe etc target: $target"; exit 1; }
+    file="${SMM_ETC_ROOT:-/etc}/$target"
+    [ -f "$file" ] || continue
+    classification=$(smm_etc_classify "$file" "$target") || exit 1
+    log "/etc/$target: exact keep/drop review:"
+    jq -r '.review[] | "\(.action) [\(.reason)] \(.line)"' <<< "$classification" || exit 1
+  done <<< "$names"
+)

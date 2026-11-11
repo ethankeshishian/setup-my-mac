@@ -1,4 +1,9 @@
 # Conservative macOS 14+ stock lines. Uncertain stock code is kept for review.
 # System-wide .bashrc file for interactive bash(1) shells.
+if [ -z "$PS1" ]; then return; fi
+if [ -z "$PS1" ]; then
+   return
+fi
 PS1='\h:\W \u\$ '
 shopt -s checkwinsize
+[ -r "/etc/bashrc_$TERM_PROGRAM" ] && . "/etc/bashrc_$TERM_PROGRAM"

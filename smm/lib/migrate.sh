@@ -81,6 +81,7 @@ smm_migrate_preview() (
     status=$(smm_migrate_status "$name") || exit 1
     printf '%s %s\n' "$name" "$status"
   done <<< "$names"
+  smm_brew_missing_preview || exit 1
   log 'Undeclared Homebrew packages:'
   smm_brew_undeclared || exit 1
   log 'Homebrew duplicates of Nix packages:'

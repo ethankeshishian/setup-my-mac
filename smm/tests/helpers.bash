@@ -114,3 +114,28 @@ finally:
     os.close(master)
 PY
 }
+
+# A sudo-requiring installer/pkg cask. The user-side bundle records its
+# environment and installed state so tests can assert preinstallation order.
+stub_pkg_brew() {
+  stub brew 0
+  # shellcheck disable=SC2016 # Expand variables when the child stub runs.
+  sed_inplace '/exit 0/i\
+case "$*" in\
+  "list --formula") [ ! -f "$TMP/brew-installed" ] || echo tpm ;;\
+  "list --cask") [ ! -f "$TMP/brew-installed" ] || echo logi-options+ ;;\
+  "info --cask --json=v2 logi-options+") echo '\''{"casks":[{"artifacts":[{"installer":[{"script":{"executable":"install.sh","sudo":true}}]},{"pkg":["driver.pkg"]}]}]}'\'' ;;\
+  "bundle install "*)\
+    printf "%s\\n" "${SUDO_ASKPASS:-unset}" > "$TMP/brew-askpass"\
+    [ "${HOMEBREW_NO_AUTO_UPDATE:-}" = 1 ] || exit 91\
+    [ "${SUDO_ASKPASS:-}" = "$SMM_TEST_ASKPASS" ] || exit 92\
+    grep -qx '\''cask "logi-options+"'\'' "$SMM_STATE/Brewfile" || exit 93\
+    grep -qx '\''brew "tpm"'\'' "$SMM_STATE/Brewfile" || exit 94\
+    [ ! -f "$TMP/brew-fail" ] || exit 95\
+    touch "$TMP/brew-installed" ;;\
+esac\
+' "$TMP/bin/brew"
+  SMM_TEST_ASKPASS="$(cd -P "$REPO" && pwd)/smm/libexec/askpass" || return 1
+  export SMM_TEST_ASKPASS
+  echo '{"taps":[],"brews":["tpm"],"casks":["logi-options+"]}' > "$SMM_REPO/manifest/homebrew.json"
+}

@@ -106,3 +106,60 @@ TEXT
   [ "$(rg -c 'environment.variables."FIRST"' "$SMM_REPO/hosts/etc/Test-Mac.nix")" -eq 1 ]
   rg -F '"two"' "$SMM_REPO/hosts/etc/Test-Mac.nix"
 }
+
+@test "SSH-only installer block is dropped without dropping surrounding user code" {
+  cat > "$SMM_ETC_ROOT/zshenv" <<'TEXT'
+export BEFORE=yes
+# Set up Nix only on SSH connections
+# See https://github.com/DeterminateSystems/nix-installer
+if [ -n "$SSH_CONNECTION" ]; then
+  if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
+    . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+  fi
+fi
+export AFTER=yes
+TEXT
+  run smm_etc_classify "$SMM_ETC_ROOT/zshenv" zshenv
+  [ "$status" -eq 0 ]
+  jq -e '.installer | length == 7' <<< "$output"
+  jq -e '.shell == "" and .variables == {BEFORE:"yes",AFTER:"yes"}' <<< "$output"
+}
+@test "macOS stock shell fixtures are dropped and user additions are preserved" {
+  for shell in bashrc zshrc; do
+    cat "$REPO/smm/tests/fixtures/etc/$shell" > "$SMM_ETC_ROOT/$shell"
+    echo 'echo custom-work-init' >> "$SMM_ETC_ROOT/$shell"
+    run smm_etc_classify "$SMM_ETC_ROOT/$shell" "$shell"
+    [ "$status" -eq 0 ]
+    jq -e '.shell == "echo custom-work-init\n" and .variables == {} and all(.review[:-1][]; .action == "DROP")' <<< "$output"
+  done
+}
+@test "etc review CLI shows accepted known and pending managed files read-only" {
+  echo '# stock comment' > "$SMM_ETC_ROOT/zshenv"
+  echo 'export WORK=keep' >> "$SMM_ETC_ROOT/zshenv"
+  stub nix 0 '{"zshenv":{"enable":true,"target":"zshenv","knownSha256Hashes":[]}}'
+  before=$(shasum "$SMM_ETC_ROOT/zshenv")
+  run "$REPO/smm/bin/smm" etc review
+  [ "$status" -eq 0 ]
+  [[ "$output" == *DROP*KEEP*WORK=keep* ]] || return 1
+  [ "$before" = "$(shasum "$SMM_ETC_ROOT/zshenv")" ]
+  ! calls | grep -Eq 'sudo|build|switch'
+  [ ! -d "$SMM_REPO/hosts/etc" ]
+}
+@test "unterminated SSH installer blocks preserve uncertain user shell code" {
+  printf '# Set up Nix only on SSH connections\nif [ -n "$SSH_CONNECTION" ]; then\n  echo preserve\n' > "$TMP/file"
+  run smm_etc_classify "$TMP/file" zshenv
+  [ "$status" -eq 0 ]
+  jq -e '.installer == [] and (.shell | contains("echo preserve"))' <<< "$output"
+}
+@test "unknown shell conditionals keep their stock-looking else and fi lines intact" {
+  cat > "$SMM_ETC_ROOT/zshrc" <<'TEXT'
+if [[ -n "$WORK_PROFILE" ]]; then
+    export WORK_ACCOUNT=custom
+else
+    echo use-default-account
+fi
+TEXT
+  run smm_etc_classify "$SMM_ETC_ROOT/zshrc" zshrc
+  [ "$status" -eq 0 ]
+  jq -e --rawfile original "$SMM_ETC_ROOT/zshrc" '.shell == $original and .variables == {} and all(.review[]; .action == "KEEP")' <<< "$output"
+}

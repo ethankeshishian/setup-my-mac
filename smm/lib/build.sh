@@ -78,7 +78,8 @@ smm_switch() {
     state=$(smm_state_dir) || return 1
     ref=$(cat "$state/last-build-flake") || return 1
   fi
-  smm_rebuild_sudo switch --flake "$ref#$host"
+  smm_rebuild_sudo switch --flake "$ref#$host" || return "$?"
+  smm_prune_flake_snapshots
 }
 smm_rollback() {
   local state
@@ -103,16 +104,59 @@ smm_use_build_tools() {
 # Git flakes omit new generated modules. A path flake of the whole checkout
 # would include ignored secrets, so snapshot only tracked/nonignored files.
 smm_flake_ref() (
+  set -o pipefail
   repo=$(smm_repo) || exit 1
   if [ "${SMM_AGENT_SETUP:-0}" != 1 ]; then printf '%s\n' "${SMM_FLAKE_REF:-$repo}"; exit 0; fi
   state=$(smm_state_dir) || exit 1
+  tmp=$(mktemp -d) || exit 1
+  trap 'rm -rf "$tmp"' EXIT
+  git -C "$repo" ls-files --cached --others --exclude-standard -z > "$tmp/files" || exit 1
+  # Hash names, contents, symlink targets and executable bits, excluding ignored
+  # secrets and deleted tracked files, exactly as they will appear in the copy.
+  hash=$(
+    while IFS= read -r -d '' file; do
+      smm_safe_relative "$file" || exit 1
+      if [ -L "$repo/$file" ]; then
+        printf 'link %s\0' "$file"
+        readlink "$repo/$file" || exit 1
+      elif [ -f "$repo/$file" ]; then
+        printf 'file %s\0' "$file"
+        if [ -x "$repo/$file" ]; then printf 'executable\0'; else printf 'regular\0'; fi
+        shasum -a 256 "$repo/$file" | awk '{print $1}' || exit 1
+      fi
+    done < "$tmp/files" | shasum -a 256 | awk '{print $1}'
+  ) || exit 1
+  for snapshot in "$state"/flake.*; do
+    [ -f "$snapshot/hash" ] && [ -d "$snapshot/source" ] || continue
+    if [ "$hash" = "$(cat "$snapshot/hash")" ]; then
+      printf 'path:%s/source\n' "$snapshot"
+      exit 0
+    fi
+  done
   snapshot=$(mktemp -d "$state/flake.XXXXXX") || exit 1
-  git -C "$repo" ls-files --cached --others --exclude-standard -z > "$snapshot/files" || exit 1
+  # Clean incomplete snapshots on copy failure or interruption.
+  trap 'rm -rf "$tmp"; [ -z "$snapshot" ] || rm -rf "$snapshot"' EXIT
+  mkdir "$snapshot/source" || exit 1
   while IFS= read -r -d '' file; do
     smm_safe_relative "$file" || exit 1
     [ -f "$repo/$file" ] || [ -L "$repo/$file" ] || continue
     mkdir -p "$snapshot/source/$(dirname "$file")" || exit 1
     cp -a "$repo/$file" "$snapshot/source/$file" || exit 1
-  done < "$snapshot/files"
+  done < "$tmp/files"
+  printf '%s\n' "$hash" > "$snapshot/hash" || exit 1
   printf 'path:%s/source\n' "$snapshot"
+  snapshot=''
 )
+smm_prune_flake_snapshots() {
+  local state ref snapshot
+  state=$(smm_state_dir) || return 1
+  [ -f "$state/last-build-flake" ] || return 0
+  ref=$(cat "$state/last-build-flake") || return 1
+  # Only our snapshots are eligible. Keep the build reference for /etc evaluation
+  # and retries, including when switching with a separate explicit flake ref.
+  for snapshot in "$state"/flake.*; do
+    [ -d "$snapshot" ] && [ ! -L "$snapshot" ] || continue
+    [ "$ref" != "path:$snapshot/source" ] || continue
+    rm -rf "$snapshot" || return 1
+  done
+}

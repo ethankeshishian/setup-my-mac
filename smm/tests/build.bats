@@ -73,3 +73,42 @@ setup() {
   run smm_generation
   [ "$status" -eq 0 ]; [ -z "$output" ]
 }
+
+@test "flake snapshots reuse unchanged content and invalidate for file content mode and deletion" {
+  make_repo "$SMM_REPO"
+  export SMM_AGENT_SETUP=1
+  first=$(smm_flake_ref)
+  [ "$first" = "$(smm_flake_ref)" ]
+  echo edit > "$SMM_REPO/flake.nix"
+  second=$(smm_flake_ref)
+  [ "$second" != "$first" ]
+  chmod +x "$SMM_REPO/flake.nix"
+  third=$(smm_flake_ref)
+  [ "$third" != "$second" ]
+  rm "$SMM_REPO/flake.nix"
+  fourth=$(smm_flake_ref)
+  [ "$fourth" != "$third" ]
+  echo private > "$SMM_REPO/secret.env"
+  echo secret.env > "$SMM_REPO/.gitignore"
+  fifth=$(smm_flake_ref)
+  echo changed-private > "$SMM_REPO/secret.env"
+  [ "$fifth" = "$(smm_flake_ref)" ]
+}
+@test "successful switch prunes old snapshots but keeps last build and failure preserves snapshots" {
+  make_repo "$SMM_REPO"
+  export SMM_AGENT_SETUP=1
+  first=$(smm_flake_ref)
+  echo new > "$SMM_REPO/flake.nix"
+  second=$(smm_flake_ref)
+  printf '%s\n' "$second" > "$SMM_STATE/last-build-flake"
+  stub sudo 1
+  run smm_switch
+  [ "$status" -ne 0 ]
+  [ -d "${first#path:}" ]
+  stub sudo 0
+  run smm_switch
+  [ "$status" -eq 0 ]
+  [ ! -d "${first#path:}" ]
+  [ -d "${second#path:}" ]
+  [ "$(find "$SMM_STATE" -maxdepth 1 -type d -name 'flake.*' | wc -l | tr -d ' ')" = 1 ]
+}

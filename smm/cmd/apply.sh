@@ -3,7 +3,7 @@
 cmd_apply() (
   case "${1:-}" in -y) export SMM_YES=1; shift ;; esac
   [ "$#" -eq 0 ] || { warn 'usage: smm apply [-y]'; exit 2; }
-  state='' prev='' switching=0 complete=0 plugins=0 failed='' status=0 name='' errors='' built_hash=''
+  state='' prev='' switching=0 complete=0 plugins=0 failed='' status=0 name='' errors=''
   original_path=$PATH
   passed=()
   state=$(smm_state_dir) || exit 1
@@ -60,12 +60,9 @@ cmd_apply() (
   done < <(link_names)
   if smm_nix_changed; then
     prev=$(smm_generation) || { warn 'cannot determine previous generation'; exit 1; }
-    built_hash=$(smm_nix_inputs_hash) || exit 1
-    smm_build || { warn 'build failed; nothing activated'; exit 1; }
     smm_brew_resolve || exit 1
-    if [ "$built_hash" != "$(smm_nix_inputs_hash)" ]; then
-      smm_build || { warn 'build after adoption failed; nothing activated'; exit 1; }
-    fi
+    smm_brew_adopt_unmanaged && smm_brew_install_missing || exit 1
+    smm_build || { warn 'build failed; nothing activated'; exit 1; }
     smm_use_build_tools || exit 1
     SMM_SKIP_AEROSPACE=1 smm_run_validate "$(smm_repo)" || exit 1
     switching=1

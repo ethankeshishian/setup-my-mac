@@ -185,3 +185,18 @@ if [[ "$*" == *--dry-run* ]]; then echo broken; exit 1; fi\
   ! calls | grep -q '^open '
   [ ! -d "$SMM_STATE/prefs" ]
 }
+@test "apply preinstalls newly declared sudo pkg cask and formula before build and switch" {
+  stub_pkg_brew
+  run /bin/bash "$REPO/smm/bin/smm" apply
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TMP/brew-askpass")" = "$SMM_TEST_ASKPASS" ]
+  install_line=$(calls | awk '/^brew bundle install/ {print NR}')
+  [ "$install_line" -lt "$(calls | awk '/^darwin-rebuild build / {print NR}')" ]
+  [ "$install_line" -lt "$(calls | awk '/^darwin-rebuild switch --flake / {print NR}')" ]
+}
+@test "failed preinstall prevents apply build and switch" {
+  stub_pkg_brew; touch "$TMP/brew-fail"
+  run "$REPO/smm/bin/smm" apply
+  [ "$status" -ne 0 ]
+  ! calls | grep -Eq '^darwin-rebuild (build|switch) '
+}

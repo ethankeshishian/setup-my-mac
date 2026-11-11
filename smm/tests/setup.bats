@@ -241,3 +241,33 @@ esac\
     [ ! -f "$SMM_REPO/hosts/New-Mac.nix" ]
   done
 }
+@test "setup preinstalls missing formula and sudo pkg cask as user before build and switch" {
+  stub_pkg_brew
+  smm_has_tty() { return 1; }
+  SETUP_STEPS=(brew_existing build switch)
+  step_build_done() { return 1; }
+  step_build_run() { [ -f "$TMP/brew-installed" ] && echo built >> "$TMP/calls.log"; }
+  step_switch_done() { return 1; }
+  step_switch_run() { [ -f "$TMP/brew-installed" ] && echo switched >> "$TMP/calls.log"; }
+  run cmd_setup
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TMP/brew-askpass")" = "$SMM_TEST_ASKPASS" ]
+  calls | grep -qx "brew bundle install --file=$SMM_STATE/Brewfile --no-upgrade"
+  [ "$(calls | awk '/^brew bundle install/ {print NR}')" -lt "$(calls | awk '/^built$/ {print NR}')" ]
+  run step_brew_existing_done
+  [ "$status" -eq 0 ]
+  : > "$TMP/calls.log"
+  run cmd_setup
+  [ "$status" -eq 0 ]
+  ! calls | grep -q '^brew bundle install '
+}
+@test "failed package preinstall stops setup before build and switch" {
+  stub_pkg_brew; touch "$TMP/brew-fail"
+  smm_has_tty() { return 1; }
+  SETUP_STEPS=(brew_existing build)
+  step_build_done() { return 1; }
+  step_build_run() { echo built >> "$TMP/calls.log"; }
+  run cmd_setup
+  [ "$status" -ne 0 ]
+  ! calls | grep -qx built
+}
