@@ -198,10 +198,14 @@ STUB
   smm_etc_entries() { printf '{"zprofile":{"enable":true,"target":"zprofile","knownSha256Hashes":["%s"]},"zshenv":{"enable":true,"target":"zshenv","knownSha256Hashes":[]}}\n' "$stock"; }
   step_build_run() { :; }
   step_etc_run
+  # Like real evaluation: the accepted module adds its hash to knownSha256Hashes.
+  accepted=$(shasum -a 256 "$SMM_ETC_ROOT/zshenv" | awk '{print $1}')
+  smm_etc_entries() { printf '{"zprofile":{"enable":true,"target":"zprofile","knownSha256Hashes":["%s"]},"zshenv":{"enable":true,"target":"zshenv","knownSha256Hashes":["%s"]}}\n' "$stock" "$accepted"; }
   run smm_etc_review
   [ "$status" -eq 0 ]
   [[ "$output" == *'zprofile: known stock hash: replaced entirely by nix-darwin'* ]] || return 1
-  ! [[ "$output" == *path_helper* ]]
+  [[ "$output" != *'zshenv: known stock hash'* ]] || return 1
+  [[ "$output" != *path_helper* ]] || return 1
   [[ "$output" == *'zshenv: already accepted in hosts/etc/Test-Mac.nix'*KEEP*WORK=keep* ]] || return 1
 }
 @test "etc paths are appended after Nix paths in path_helper order in bash and zsh" {
@@ -211,8 +215,10 @@ STUB
   printf '# note\n\n/pkg/env/global/bin' > "$TMP/root/paths.d/10-pmk-global"
   # A deleted working directory from an earlier test makes the shell warn.
   cd "$TMP"
-  for shell in /bin/bash /bin/zsh; do
-    run env -i PATH=/nix/bin:/usr/bin __smm_etc_root="$TMP/root" "$shell" -c ". '$REPO/modules/darwin/etc-paths.sh'; echo \"\$PATH\"; typeset -f __smm_etc_paths >/dev/null && echo LEAK; :"
+  # Keep the user's startup files (e.g. ~/.zshenv) from changing PATH.
+  for shell in '/bin/bash --norc --noprofile' '/bin/zsh -f'; do
+    # shellcheck disable=SC2086 # Split the shell and its flags.
+    run env -i HOME="$TMP" PATH=/nix/bin:/usr/bin __smm_etc_root="$TMP/root" $shell -c ". '$REPO/modules/darwin/etc-paths.sh'; echo \"\$PATH\"; typeset -f __smm_etc_paths >/dev/null && echo LEAK; :"
     [ "$status" -eq 0 ]
     [ "$output" = /nix/bin:/usr/bin:/System/Cryptexes/App/usr/bin:/pkg/env/global/bin:/opt/X11/bin ] || { echo "shell=$shell output=[$output]"; return 1; }
   done

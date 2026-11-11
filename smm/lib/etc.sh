@@ -156,12 +156,13 @@ smm_etc_review() (
       esac
     fi
     sha=$(shasum -a 256 "$file" | awk '{print $1}') || exit 1
-    if [ "$(jq -r --arg sha "$sha" '.knownSha256Hashes | index($sha)' <<< "$entry")" != null ]; then
-      log "/etc/$target: known stock hash: replaced entirely by nix-darwin; nothing in it is kept"
-      continue
-    fi
+    # Accepted entries add their hash to knownSha256Hashes too, so check the
+    # accepted marker first; otherwise they would be reported as stock.
     if [ -f "$generated" ] && grep -Fxq "    # smm-accepted $(smm_nix_string "$name") $sha" "$generated"; then
       status="already accepted in hosts/etc/$(basename "$generated")"
+    elif [ "$(jq -r --arg sha "$sha" '.knownSha256Hashes | index($sha)' <<< "$entry")" != null ]; then
+      log "/etc/$target: known stock hash: replaced entirely by nix-darwin; nothing in it is kept"
+      continue
     else
       status='pending (decision needed)'
     fi
