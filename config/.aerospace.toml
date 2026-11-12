@@ -51,7 +51,7 @@ on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
 automatically-unhide-macos-hidden-apps = false
 
 # Only the first matching rule runs, so app-specific rules go above the catch-all.
-# Every window floats; these rules just pick its home workspace.
+# Windows float unless a rule below tiles them; the rules pick each window's home workspace.
 [[on-window-detected]]
   if.app-id = 'com.mitchellh.ghostty'
   run = ['layout floating', 'move-node-to-workspace 1']
@@ -63,6 +63,41 @@ automatically-unhide-macos-hidden-apps = false
 [[on-window-detected]]
   if.app-id = 'app.zen-browser.whimsy'
   run = ['layout floating', 'move-node-to-workspace 2']
+
+# Communication apps tile in an accordion on workspace 3: one window in front, the rest
+# peeking out at the edges.
+[[on-window-detected]]
+  if.app-id = 'us.zoom.xos' # Zoom
+  run = ['layout tiling', 'move-node-to-workspace 3', 'layout accordion']
+
+[[on-window-detected]]
+  if.app-id = 'com.linear' # Linear
+  run = ['layout tiling', 'move-node-to-workspace 3', 'layout accordion']
+
+[[on-window-detected]]
+  if.app-id = 'com.tinyspeck.slackmacgap' # Slack
+  run = ['layout tiling', 'move-node-to-workspace 3', 'layout accordion']
+
+[[on-window-detected]]
+  if.app-id = 'notion.id' # Notion
+  run = ['layout tiling', 'move-node-to-workspace 3', 'layout accordion']
+
+# Superhuman, Obsidian, Todoist and Notion Calendar tile in an accordion on workspace 4.
+[[on-window-detected]]
+  if.app-id = 'com.superhuman.electron' # Superhuman
+  run = ['layout tiling', 'move-node-to-workspace 4', 'layout accordion']
+
+[[on-window-detected]]
+  if.app-id = 'md.obsidian' # Obsidian
+  run = ['layout tiling', 'move-node-to-workspace 4', 'layout accordion']
+
+[[on-window-detected]]
+  if.app-id = 'com.todoist.mac.Todoist' # Todoist
+  run = ['layout tiling', 'move-node-to-workspace 4', 'layout accordion']
+
+[[on-window-detected]]
+  if.app-id = 'com.cron.electron' # Notion Calendar
+  run = ['layout tiling', 'move-node-to-workspace 4', 'layout accordion']
 
 # Catch-all: everything else
 [[on-window-detected]]
