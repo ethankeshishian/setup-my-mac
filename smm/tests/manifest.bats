@@ -65,13 +65,14 @@ setup() {
 
 @test "homebrew manifest contains the approved packages sorted without duplicates" {
   jq -e '
-    .taps == [] and .brews == ["direnv", "tpm"] and
+    .taps == ["coreyhaines31/tap"] and .brews == ["direnv", "tpm"] and
     .casks == (.casks | unique | sort) and .casks == ([
       "spotify", "arc", "todoist", "obsidian", "clay", "notion-calendar",
       "raindropio", "visual-studio-code", "mos", "mac-mouse-fix@2",
       "betterdisplay", "logi-options+", "raycast", "karabiner-elements",
       "font-martian-mono-nerd-font", "font-hack-nerd-font", "1password", "1password-cli",
-      "hiddenbar", "vercel", "antigravity-cli", "codex", "claude-code@latest", "superhuman"
+      "hiddenbar", "vercel", "antigravity-cli", "codex", "claude-code@latest", "superhuman",
+      "coreyhaines31/tap/midnightoil"
     ] | sort)' "$REPO/manifest/homebrew.json"
 }
 

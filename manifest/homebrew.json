@@ -1,5 +1,7 @@
 {
-  "taps": [],
+  "taps": [
+    "coreyhaines31/tap"
+  ],
   "brews": [
     "direnv",
     "tpm"
@@ -13,6 +15,7 @@
     "claude-code@latest",
     "clay",
     "codex",
+    "coreyhaines31/tap/midnightoil",
     "font-hack-nerd-font",
     "font-martian-mono-nerd-font",
     "hiddenbar",
