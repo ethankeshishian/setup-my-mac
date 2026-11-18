@@ -54,3 +54,17 @@ upgrade_fixture() {
   [[ "$output" == *"Homebrew app versions can't be reverted"* ]]
   run cmd_undo; [ "$status" -eq 1 ]; [[ "$output" == *'no upgrade to undo'* ]]
 }
+@test "plugin restore first moves lazy.nvim to its locked commit" {
+  lazy="$TMP/data/nvim/lazy/lazy.nvim"
+  mkdir -p "$lazy" "$SMM_REPO/config/nvim"
+  git -C "$lazy" init -q
+  git -C "$lazy" -c user.name=t -c user.email=t@t commit -q --allow-empty -m old
+  old=$(git -C "$lazy" rev-parse HEAD)
+  git -C "$lazy" -c user.name=t -c user.email=t@t commit -q --allow-empty -m new
+  new=$(git -C "$lazy" rev-parse HEAD)
+  git -C "$lazy" checkout -q "$old"
+  printf '{"lazy.nvim":{"branch":"main","commit":"%s"}}\n' "$new" > "$SMM_REPO/config/nvim/lazy-lock.json"
+  XDG_DATA_HOME="$TMP/data" smm_nvim_run '+Lazy! restore'
+  [ "$(git -C "$lazy" rev-parse HEAD)" = "$new" ]
+  calls | grep -q '^nvim --headless +Lazy! restore +qa$'
+}

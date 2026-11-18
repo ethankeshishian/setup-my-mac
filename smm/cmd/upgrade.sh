@@ -1,7 +1,21 @@
 #!/usr/bin/env bash
 
+# An older lazy.nvim cannot restore newer pins: it leaves plugins where they
+# are and rewrites the lock with them. Move lazy.nvim itself to its pin first.
+smm_nvim_pin_lazy() {
+  local dir sha
+  dir="${XDG_DATA_HOME:-$HOME/.local/share}/nvim/lazy/lazy.nvim"
+  [ -d "$dir/.git" ] || return 0
+  sha=$(jq -r '."lazy.nvim".commit // empty' "$(smm_repo)/config/nvim/lazy-lock.json") || return 1
+  [ -n "$sha" ] || return 0
+  [ "$(git -C "$dir" rev-parse HEAD 2>/dev/null)" != "$sha" ] || return 0
+  git -C "$dir" cat-file -e "$sha^{commit}" 2>/dev/null || git -C "$dir" fetch -q origin || return 1
+  git -C "$dir" checkout -q "$sha"
+}
+
 # Always operate on the managed config, even before home-manager has linked it.
 smm_nvim_run() (
+  smm_nvim_pin_lazy || exit 1
   tmp=$(mktemp -d) || exit 1
   trap 'rm -rf "$tmp"' EXIT
   ln -s "$(smm_repo)/config/nvim" "$tmp/nvim" || exit 1
