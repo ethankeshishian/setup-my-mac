@@ -10,5 +10,6 @@
   {"name":"p10k","source":"config/.p10k.zsh","target":".p10k.zsh","type":"file","validator":"zsh","reload":null},
   {"name":"mmf","source":"config/mmf/config.plist","target":"Library/Application Support/com.nuebling.mac-mouse-fix/config.plist","type":"file","validator":"plist","reload":null},
   {"name":"nvim","source":"config/nvim","target":".config/nvim","type":"dir","validator":"nvim","reload":null},
-  {"name":"git","source":"config/git/config","target":".config/git/config","type":"file","validator":"git","reload":null}
+  {"name":"git","source":"config/git/config","target":".config/git/config","type":"file","validator":"git","reload":null},
+  {"name":"claude-tmux","source":"config/bin/claude-tmux","target":".local/bin/claude-tmux","type":"file","validator":null,"reload":null}
 ]

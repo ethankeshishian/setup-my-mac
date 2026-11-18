@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# tmux-resurrect hook: make each saved Claude Code pane restore its own conversation.
+#
+# Resurrect saves the command line it sees (often just `claude` or `claude --resume`),
+# which would reopen the wrong conversation. Claude Code records each running session in
+# ~/.claude/sessions/<pid>.json (sessionId, plus the tmux pane it runs in), so this rewrites
+# every Claude pane's saved command to `claude --resume <sessionId>`.
+#
+#   claude-tmux resurrect-hook <save-file>   run by @resurrect-hook-post-save-layout
+set -euo pipefail
+
+sessions_dir="$HOME/.claude/sessions"
+
+rewrite_save() {
+  local file=$1 f pairs='' tmp
+  [[ -f $file && -d $sessions_dir ]] || return 0
+
+  # "pane_id<TAB>sessionId" for live Claude processes only.
+  for f in "$sessions_dir"/*.json; do
+    [[ -e $f ]] || continue
+    kill -0 "$(basename "$f" .json)" 2>/dev/null || continue
+    pairs+=$(jq -r 'select(((.tmux // "") | test("%[0-9]+$")) and ((.sessionId // "") | test("^[0-9a-f-]+$")))
+      | "\(.tmux | capture("(?<p>%[0-9]+)$").p)\t\(.sessionId)"' "$f" 2>/dev/null)$'\n' || true
+  done
+  [[ -n ${pairs//[$'\n']/} ]] || return 0
+
+  # Pane lines: pane, session, window, window_active, :flags, pane_index, title, :dir,
+  # pane_active, command, :full_command (tab-separated).
+  tmp=$(mktemp "$file.XXXXXX")
+  tmux list-panes -a -F $'#{pane_id}\t#{session_name}:#{window_index}.#{pane_index}' |
+    PAIRS=$pairs awk -F'\t' -v OFS='\t' '
+      BEGIN { n = split(ENVIRON["PAIRS"], rows, "\n"); for (i = 1; i <= n; i++) if (split(rows[i], kv, "\t") == 2) sid[kv[1]] = kv[2] }
+      NR == FNR { if ($1 in sid) id[$2] = sid[$1]; next }
+      $1 == "pane" && $10 == "claude" && (($2 ":" $3 "." $6) in id) { $11 = ":claude --resume " id[$2 ":" $3 "." $6] }
+      { print }' - "$file" > "$tmp"
+  mv -f "$tmp" "$file"
+}
+
+case ${1:-} in
+  resurrect-hook) rewrite_save "${2:-}" ;;
+  *) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac
