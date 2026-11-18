@@ -17,7 +17,7 @@ smm_setup_plan() (
   host=$(smm_host) || exit 1
   smm_brew_missing_preview || exit 1
   signed_in=0
-  op whoami >/dev/null 2>&1 && signed_in=1
+  smm_op_signed_in && signed_in=1
   {
     if ! step_host_done; then
       smm_plan_question host.name 'Host name:' "$host" '' text

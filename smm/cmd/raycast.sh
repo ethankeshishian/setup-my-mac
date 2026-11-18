@@ -11,7 +11,7 @@ cmd_raycast() (
   case "$file" in *.rayconfig) ;; *) warn 'expected a .rayconfig file'; exit 1 ;; esac
   [ -f "$file" ] || { warn 'Raycast export file missing'; exit 1; }
   version=$(smm_app_version raycast) || { warn 'Raycast not installed or version unreadable'; exit 1; }
-  op whoami >/dev/null 2>&1 || { warn '1Password not signed in'; exit 1; }
+  smm_op_signed_in || { warn '1Password not signed in'; exit 1; }
   result=0
   document=$(smm_raycast_document) || result=$?
   tags="smm-raycast-version:$version,smm-raycast-exported:$(date +%s)"

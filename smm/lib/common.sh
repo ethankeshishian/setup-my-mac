@@ -136,3 +136,8 @@ smm_resource_root() {
   dir=$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || return 1
   printf '%s\n' "$dir"
 }
+
+# With 1Password app integration, op whoami reports "not signed in" even
+# after the app approved this process; a real request is what triggers and
+# then reflects that approval.
+smm_op_signed_in() { op vault list --format json >/dev/null 2>&1; }

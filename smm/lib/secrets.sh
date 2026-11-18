@@ -12,7 +12,7 @@ smm_secrets_materialize() (
     dest="$HOME/$target"
     if [ "$refresh" -eq 0 ] && [ -f "$dest" ]; then continue; fi
     if [ "$signed_in" -eq 0 ]; then
-      if op whoami >/dev/null 2>&1; then signed_in=1; else signed_in=2; fi
+      if smm_op_signed_in; then signed_in=1; else signed_in=2; fi
     fi
     if [ "$signed_in" -eq 2 ]; then warn "$name: 1Password not signed in, skipping"; continue; fi
     mkdir -p "$(dirname "$dest")" || exit 1

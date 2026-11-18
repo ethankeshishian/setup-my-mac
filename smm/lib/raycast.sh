@@ -27,7 +27,7 @@ smm_raycast_export_version() {
 }
 step_raycast_done() {
   local document revision state
-  op whoami >/dev/null 2>&1 || return 1
+  smm_op_signed_in || return 1
   document=$(smm_raycast_document) || return 1
   revision=$(smm_raycast_revision <<< "$document") || return 1
   state=$(smm_state_dir) || return 1
@@ -38,7 +38,7 @@ step_raycast_run() (
   umask 077
   state=$(smm_state_dir) || exit 1
   skipped="$state/raycast-skipped"
-  if ! op whoami >/dev/null 2>&1; then
+  if ! smm_op_signed_in; then
     echo 'Raycast: 1Password not signed in; import skipped (degraded).' > "$skipped"
     cat "$skipped"; exit 0
   fi
@@ -90,7 +90,7 @@ step_raycast_run() (
 )
 smm_raycast_reminder() {
   local document exporting timestamp now
-  op whoami >/dev/null 2>&1 || return 0
+  smm_op_signed_in || return 0
   document=$(smm_raycast_document) || return 0
   # The export date tag survives unrelated item edits. Older documents fall back
   # to 1Password's updated_at timestamp.

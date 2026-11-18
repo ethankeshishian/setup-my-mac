@@ -512,7 +512,7 @@ step_permissions_run() {
   # Start the Nix-installed AltTab so it can ask for, and use, its permissions.
   if smm_app_bundle alttab >/dev/null; then open -a "$(smm_app_bundle alttab)" || :; smm_wait_permission alttab; fi
 }
-step_signin_done() { op whoami >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; }
+step_signin_done() { smm_op_signed_in && gh auth status >/dev/null 2>&1; }
 step_signin_run() (
   local file answer result=0 pid='' state
   trap '[ -z "$pid" ] || { kill "$pid" 2>/dev/null || :; wait "$pid" 2>/dev/null || :; }' EXIT
@@ -522,7 +522,7 @@ step_signin_run() (
   file="$state/signin-skipped"
   : > "$file"
   if [ -n "${SMM_ANSWERS:-}" ] || ! smm_has_tty; then
-    if ! op whoami >/dev/null 2>&1; then
+    if ! smm_op_signed_in; then
       answer=$(smm_answer signin.op 'Sign in to 1Password now?' now skip) || return "$?"
       case "$answer" in
         skip) printf '1Password not signed in (weather disabled)\n' >> "$file" ;;
@@ -550,14 +550,14 @@ step_signin_run() (
       esac
     fi
   else
-    if ! op whoami >/dev/null 2>&1; then
+    if ! smm_op_signed_in; then
       if smm_setup_confirm signin.op 'Sign in to 1Password now?'; then
         open -a '1Password' || return 1
-        while ! op whoami >/dev/null 2>&1; do
+        while ! smm_op_signed_in; do
           smm_setup_confirm user.op 'Enable 1Password CLI integration. Done (or cancel to skip)?' || break
         done
       fi
-      op whoami >/dev/null 2>&1 || printf '1Password not signed in (weather disabled)\n' >> "$file"
+      smm_op_signed_in || printf '1Password not signed in (weather disabled)\n' >> "$file"
     fi
     if ! gh auth status >/dev/null 2>&1; then
       if smm_setup_confirm signin.gh 'Sign in to GitHub now?'; then gh auth login --web || :; fi
@@ -567,7 +567,7 @@ step_signin_run() (
   if [ -s "$file" ]; then warn "degraded: $(cat "$file")"; fi
   return 0
 )
-smm_op_ready() { op whoami >/dev/null 2>&1; }
+smm_op_ready() { smm_op_signed_in; }
 smm_wait_github() {
   local elapsed=0 limit=${SMM_WAIT_SECONDS:-600} line seen=0 count=0
   case "$limit" in ''|*[!0-9]*) warn 'invalid SMM_WAIT_SECONDS'; return 1 ;; esac
@@ -605,7 +605,7 @@ smm_setup_read_secret() {
 }
 step_secrets_run() (
   umask 077
-  op whoami >/dev/null 2>&1 || { smm_secrets_materialize; exit "$?"; }
+  smm_op_signed_in || { smm_secrets_materialize; exit "$?"; }
   tmp=$(mktemp -d) || exit 1
   trap 'rm -rf "$tmp"' EXIT
   mkdir -p "$tmp/repo/manifest" || exit 1
