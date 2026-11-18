@@ -341,7 +341,7 @@ step_dedupe_done() {
   [ -z "$duplicates" ]
 }
 # Cask token -> the app name macOS knows it by.
-smm_cask_app() { case "$1" in alt-tab) echo AltTab ;; aerospace) echo AeroSpace ;; *) echo "$1" ;; esac; }
+smm_cask_app() { case "$1" in alt-tab) echo AltTab ;; aerospace) echo AeroSpace ;; ghostty|ghostty@tip) echo Ghostty ;; *) echo "$1" ;; esac; }
 step_dedupe_run() {
   local duplicates kind name file services taps full
   duplicates=$(smm_brew_duplicates) || return 1
@@ -376,7 +376,8 @@ smm_setup_restore_brew() {
   services="$(smm_state_dir)/deduped-services"
   taps="$(smm_state_dir)/deduped-taps"
   [ -s "$file" ] || return 0
-  while IFS=' ' read -r kind name; do
+  # Read the list on fd 3: brew install reads stdin and would swallow the rest.
+  while IFS=' ' read -r kind name <&3; do
     case "$kind" in
       brew)
         # These were installed before setup removed them. Homebrew refuses
@@ -392,7 +393,7 @@ smm_setup_restore_brew() {
         brew install --cask "$name" && open -a "$(smm_cask_app "$name")" || failed=1 ;;
       *) failed=1 ;;
     esac
-  done < "$file"
+  done 3< "$file"
   [ "$failed" -ne 0 ] || { : > "$file"; rm -f "$services" "$taps"; }
   return "$failed"
 }

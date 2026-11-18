@@ -289,6 +289,7 @@ esac\
   smm_brew_duplicates() { printf 'brew sketchybar\nbrew fd\n'; }
   stub brew 0
   sed_inplace '/exit 0/i\
+[ "$1" != install ] || cat > /dev/null\
 case "$*" in\
   "services list") printf "Name Status User File\\nsketchybar started me x\\nfd none\\n" ;;\
   "list --full-name --formula") printf "fd\\nfelixkratz/formulae/sketchybar\\n" ;;\
@@ -299,7 +300,7 @@ esac\
   run step_dedupe_run; [ "$status" -eq 0 ]
   [ "$(cat "$SMM_STATE/deduped-services")" = sketchybar ]
   [ "$(cat "$SMM_STATE/deduped-taps")" = 'sketchybar felixkratz/formulae/sketchybar' ]
-  run smm_setup_restore_brew; [ "$status" -eq 0 ]
+  run smm_setup_restore_brew < /dev/null; [ "$status" -eq 0 ]
   calls | grep -qx 'brew install felixkratz/formulae/sketchybar'; calls | grep -qx 'brew install fd'
   ! calls | grep -qx 'brew trust --formula fd' || return 1
   calls | grep -qx 'brew services start sketchybar'

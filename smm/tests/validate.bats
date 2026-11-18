@@ -123,6 +123,18 @@ PY
   [ ! -e "$SMM_STATE/aerospace.swap" ]
   [ ! -e "$SMM_STATE/aerospace.lock" ]
 }
+@test "ghostty validation finds the bundled themes of a Nix CLI wrapper" {
+  load_lib
+  pkg="$TMP/store/ghostty-bin"
+  mkdir -p "$pkg/bin" "$pkg/Applications/Ghostty.app/Contents/Resources/ghostty/themes" "$TMP/sw"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$GHOSTTY_RESOURCES_DIR" > "$TMP/resources"\n' > "$pkg/bin/ghostty"
+  chmod +x "$pkg/bin/ghostty"
+  ln -s "$pkg/bin/ghostty" "$TMP/sw/ghostty"
+  # A Ghostty terminal exports its own app's resources, which may be gone.
+  GHOSTTY_RESOURCES_DIR=/Applications/Ghostty.app/Contents/Resources/ghostty \
+    PATH="$TMP/sw:$PATH" validate_ghostty "$TMP/ghostty dir"
+  [ "$(cat "$TMP/resources")" = "$(cd "$pkg" && pwd -P)/Applications/Ghostty.app/Contents/Resources/ghostty" ]
+}
 @test "tmux zsh plist ghostty and git use the specified validator arguments" {
   load_lib
   stub tmux 0

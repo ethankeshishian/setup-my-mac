@@ -80,7 +80,16 @@ validate_aerospace() (
   aerospace_restore
   exit "$status"
 )
-validate_ghostty() { ghostty +validate-config "--config-file=$1/config"; }
+# Ghostty finds its bundled themes through GHOSTTY_RESOURCES_DIR, which a
+# Ghostty terminal exports pointing at its own app (gone once setup removes
+# the Homebrew cask). Point it at the bundle of the Nix ghostty being run.
+validate_ghostty() (
+  bin=$(command -v ghostty) || exit 1
+  bin=$(readlink -f "$bin" 2>/dev/null) || bin=''
+  resources="${bin%/bin/ghostty}/Applications/Ghostty.app/Contents/Resources/ghostty"
+  if [ -n "$bin" ] && [ -d "$resources" ]; then export GHOSTTY_RESOURCES_DIR="$resources"; fi
+  ghostty +validate-config "--config-file=$1/config"
+)
 validate_karabiner() (
   dir=$1 tmp='' profile='' status=0 cli=''
   jq empty "$dir/karabiner.json" || exit 1
