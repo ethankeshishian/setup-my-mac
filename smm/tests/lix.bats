@@ -114,7 +114,7 @@ stub_download() {
   stub_nix 'nix (Lix, like Nix) 2.95.2' 1
   stub_repair nix-installer; stub_repair lix-installer
   run step_nix_run; [ "$status" -eq 0 ]
-  calls | grep -qx 'lix-installer repair'
+  calls | grep -qx 'lix-installer repair --no-confirm'
   ! calls | grep -Eq '^nix-installer|curl|uninstall'
 }
 @test "unhealthy Lix without its installer stops with repair instructions" {
@@ -138,7 +138,7 @@ stub_download() {
   stub_nix 'nix (Determinate Nix) 3' 1
   stub_repair nix-installer; stub_repair lix-installer
   run step_nix_run; [ "$status" -eq 0 ]
-  calls | grep -qx 'nix-installer repair'
+  calls | grep -qx 'nix-installer repair --no-confirm'
   ! calls | grep -Eq '^lix-installer|curl|uninstall'
 }
 @test "missing Nix downloads the host installer runs install and cleans up" {
@@ -155,7 +155,7 @@ stub_download() {
     stub_download
     run step_nix_run; [ "$status" -eq 0 ]
     calls | grep -Fq "$url"
-    calls | grep -qx 'installer install'
+    calls | grep -qx 'installer install --no-confirm'
     [ ! -e "$(cat "$TMP/download-path")" ]
     : > "$TMP/calls.log"
   done
@@ -191,6 +191,6 @@ stub_download() {
 cp "$TMP/next-nix" "$TMP/bin/nix"\
 ' "$SMM_NIX_ROOT/nix-installer"
   run step_nix_run; [ "$status" -eq 0 ]
-  calls | grep -qx 'nix-installer repair'
+  calls | grep -qx 'nix-installer repair --no-confirm'
   ! calls | grep -Eq 'curl|uninstall'
 }

@@ -159,9 +159,13 @@ setup() {
 #!/usr/bin/env bash
 sudo echo installer
 printf '%s\n' "$SUDO_ASKPASS" > "$TMP/askpass-path"
+printf '%s\n' "$*" > "$TMP/installer-args"
 INSTALLER
   run smm_installer_run "$TMP/installer" install
   [ "$status" -eq 0 ]; calls | grep -qx 'sudo -A echo installer'
+  [ "$(cat "$TMP/installer-args")" = 'install --no-confirm' ]
+  run smm_installer_run "$TMP/installer" repair
+  [ "$status" -eq 0 ]; [ "$(cat "$TMP/installer-args")" = 'repair --no-confirm' ]
   [ "$(cat "$TMP/askpass-path")" = "$(cd -P "$REPO" && pwd)/smm/libexec/askpass" ]
 }
 @test "invalid secret confirmation is a hard error and never fetches a value" {

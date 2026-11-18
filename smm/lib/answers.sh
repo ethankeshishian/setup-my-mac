@@ -91,5 +91,8 @@ exec "$SMM_INSTALLER_SUDO" -A "$@"
 SHIM
   chmod +x "$tmp/sudo" || exit 1
   export PATH="$tmp:$PATH"
+  # Without a terminal the Nix installers refuse to prompt; the plan answers
+  # already approved the install, so accept the installer's defaults.
+  case "${2:-}" in install|repair) set -- "$@" --no-confirm ;; esac
   case "$1" in *.sh|*/installer) sh "$@" ;; *) "$@" ;; esac
 )
