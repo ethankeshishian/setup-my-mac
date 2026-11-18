@@ -18,7 +18,8 @@ smm_health() {
     [ "$count" -eq "$spaces" ] || sketchybar_reason=space-count-mismatch
   fi
   pgrep -x borders >/dev/null || borders_reason=not-running
-  pgrep -f karabiner_console_user_server >/dev/null || karabiner_reason=not-running
+  # Karabiner-Elements 16 renamed karabiner_console_user_server.
+  pgrep -if 'karabiner[-_]console[-_]user[-_]server' >/dev/null || karabiner_reason=not-running
   jq -n --arg aerospace "$aerospace_reason" --arg sketchybar "$sketchybar_reason" \
     --arg borders "$borders_reason" --arg karabiner "$karabiner_reason" \
     '{aerospace:$aerospace, sketchybar:$sketchybar, borders:$borders, karabiner:$karabiner}' > "$state/health.json" || return 1
