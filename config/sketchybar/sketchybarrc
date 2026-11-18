@@ -89,7 +89,10 @@ do
   ((i++))
 done
 
-sketchybar --set space_ex.1 padding_left=-999999
+# Pull the overlay back over the space numbers: each space is 48px (30 icon +
+# 18 padding), plus 4px from the highlight dot. A huge negative padding used
+# to do this, but SketchyBar 2.24 clamps it 18px short of the first number.
+sketchybar --set space_ex.1 padding_left=$(( -(i * 48 + 4) ))
 
 # update defaults
 sketchybar --default                                                \
