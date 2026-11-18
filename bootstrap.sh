@@ -46,13 +46,16 @@ if ! command -v nix >/dev/null 2>&1 && [ ! -x /nix/var/nix/profiles/default/bin/
   rm -f "$installer"
   trap - EXIT
 fi
-for profile in /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh "$HOME/.nix-profile/etc/profile.d/nix.sh"; do
-  if [ -f "$profile" ]; then
-    # shellcheck source=/dev/null
-    source "$profile"
-    break
-  fi
-done
+# A fresh install isn't on PATH yet; an existing nix on PATH stays first.
+if ! command -v nix >/dev/null 2>&1; then
+  for profile in /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh "$HOME/.nix-profile/etc/profile.d/nix.sh"; do
+    if [ -f "$profile" ]; then
+      # shellcheck source=/dev/null
+      source "$profile"
+      break
+    fi
+  done
+fi
 command -v nix >/dev/null 2>&1 || { printf 'Nix is unavailable; open a new shell and rerun bootstrap.sh\n' >&2; exit 1; }
 if [ ! -d "$repo/.git" ]; then
   [ ! -e "$repo" ] || { printf 'Refusing to replace existing path: %s\n' "$repo" >&2; exit 1; }
