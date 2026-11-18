@@ -106,6 +106,25 @@ STUB
   calls | grep -qx 'brew install --cask --adopt arc'
   ! calls | grep -q -- '--force'
 }
+@test "app deleted by a failed adopt is put back" {
+  stub_cask_brew
+  printf '%s\n' '{"taps":[],"brews":[],"casks":["arc"]}' > "$SMM_REPO/manifest/homebrew.json"
+  echo original > "$SMM_APPLICATIONS_DIR/Arc.app/marker"
+  sed_inplace 's|^  install) .*|  install) rm -rf "$SMM_APPLICATIONS_DIR/Arc.app"; exit 1 ;;|' "$TMP/bin/brew"
+  choose() { return 99; }
+  run smm_brew_adopt_unmanaged
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'it has been put back'* ]]
+  [ "$(cat "$SMM_APPLICATIONS_DIR/Arc.app/marker")" = original ]
+  [ -z "$(ls -A "$(smm_state_dir)/adopt-backup")" ]
+}
+@test "successful adopt leaves no backup copy" {
+  stub_cask_brew
+  printf '%s\n' '{"taps":[],"brews":[],"casks":["arc"]}' > "$SMM_REPO/manifest/homebrew.json"
+  smm_brew_adopt_unmanaged
+  [ -d "$SMM_APPLICATIONS_DIR/Arc.app" ]
+  [ -z "$(ls -A "$(smm_state_dir)/adopt-backup")" ]
+}
 @test "differing unmanaged app is never replaced without asking" {
   stub_cask_brew
   choose() { return 99; }

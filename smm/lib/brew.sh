@@ -68,6 +68,24 @@ smm_brew_unmanaged_casks() {
     if [ -n "$app" ] && [ -d "$apps/$app" ]; then printf '%s\t%s\n' "$cask" "$app"; fi
   done <<< "$casks"
 }
+# A failed brew --adopt deletes the app it was taking over (Obsidian did when
+# its cask expected a file the older app lacked), so keep a copy to put back.
+smm_brew_adopt() (
+  cask=$1 path="${SMM_APPLICATIONS_DIR:-/Applications}/$2"
+  state=$(smm_state_dir) || exit 1
+  saved="$state/adopt-backup/$2"
+  rm -rf "$saved"; mkdir -p "$state/adopt-backup" || exit 1
+  if [ -e "$path" ]; then
+    cp -cpR "$path" "$saved" 2>/dev/null || { rm -rf "$saved"; ditto "$path" "$saved"; } || exit 1
+  fi
+  if smm_brew_user install --cask --adopt "$cask"; then rm -rf "$saved"; exit 0; fi
+  if [ -e "$path" ] || [ ! -e "$saved" ]; then rm -rf "$saved"
+  else
+    mv "$saved" "$path" || { warn "Homebrew removed $2; a copy is in $saved"; exit 1; }
+    warn "Homebrew could not adopt $2 and removed it; it has been put back."
+  fi
+  exit 1
+)
 smm_brew_adopt_unmanaged() {
   local unmanaged cask app answer
   unmanaged=$(smm_brew_unmanaged_casks) || return 1
@@ -76,7 +94,7 @@ smm_brew_adopt_unmanaged() {
     if [ -n "${SMM_ANSWERS:-}" ] || [ "${SMM_AGENT_SETUP:-0}" = 1 ]; then
       answer=$(smm_answer "unmanaged.$cask" "$app is installed outside Homebrew" adopt replace stop) || return "$?"
       case "$answer" in
-        adopt) smm_brew_user install --cask --adopt "$cask" || return 1 ;;
+        adopt) smm_brew_adopt "$cask" "$app" || { warn "Answer replace for unmanaged.$cask to install the Homebrew version instead."; return 1; } ;;
         replace) smm_brew_user install --cask --force "$cask" || return 1 ;;
         stop) warn "Stopped before taking over $app; review answers and rerun setup."; return 1 ;;
       esac
@@ -84,7 +102,7 @@ smm_brew_adopt_unmanaged() {
     fi
     # --adopt takes over the existing app; it refuses one whose version differs
     # unless the cask auto-updates.
-    smm_brew_user install --cask --adopt "$cask" && continue
+    smm_brew_adopt "$cask" "$app" && continue
     answer=''
     if smm_brew_interactive; then
       answer=$(choose "$app is installed outside Homebrew and differs from the $cask cask" \
