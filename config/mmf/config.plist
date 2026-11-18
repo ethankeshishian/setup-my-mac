@@ -181,9 +181,9 @@
 		<key>lastLaunchedBundleVersion</key>
 		<integer>7603</integer>
 		<key>launchesOfCurrentBundleVersion</key>
-		<integer>17</integer>
+		<integer>22</integer>
 		<key>launchesOverall</key>
-		<integer>17</integer>
+		<integer>22</integer>
 		<key>skippedBundleVersion</key>
 		<integer>0</integer>
 	</dict>
@@ -328,7 +328,7 @@
 		<key>roughParameters (unused)</key>
 		<dict/>
 		<key>smooth</key>
-		<integer>0</integer>
+		<integer>1</integer>
 		<key>smoothParameters</key>
 		<dict>
 			<key>acceleration</key>
