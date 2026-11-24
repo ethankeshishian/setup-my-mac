@@ -13,7 +13,21 @@ in
       show-recents = false;
       expose-group-apps = true;
     };
-    NSGlobalDomain._HIHideMenuBar = true;
+    NSGlobalDomain = {
+      _HIHideMenuBar = true;
+      # The fastest repeat rate and shortest delay the Keyboard settings sliders allow.
+      KeyRepeat = 2;
+      InitialKeyRepeat = 15;
+      # Desktop & Dock: prefer tabs when opening documents: Always.
+      AppleWindowTabbingMode = "always";
+    };
+    finder = {
+      # Search the current folder instead of the whole Mac.
+      FXDefaultSearchScope = "SCcf";
+      FXEnableExtensionChangeWarning = false;
+      ShowPathbar = true;
+      ShowStatusBar = true;
+    };
     trackpad = {
       Clicking = true;
       TrackpadThreeFingerDrag = true;
